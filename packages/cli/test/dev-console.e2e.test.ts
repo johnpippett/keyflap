@@ -9,6 +9,7 @@ import { PtySession } from './pty.ts';
 
 const ENTER_ALT = '\u001b[?1049h';
 const LEAVE_ALT = '\u001b[?1049l';
+const ttyLines = (output: string) => output.replace(/\r+\n/g, '\n');
 
 describe('keyflap with no command, as the user, in a real terminal', () => {
   let home: string;
@@ -92,7 +93,7 @@ describe('keyflap with no command, as the user, in a real terminal', () => {
     mkdirSync(home, { recursive: true });
     s = start();
     expect(await s.exited).toBe(0);
-    expect(s.output.replaceAll('\r\n', '\n')).toBe(USAGE);
+    expect(ttyLines(s.output)).toBe(USAGE);
     expect(s.output).not.toContain(ENTER_ALT);
   });
 

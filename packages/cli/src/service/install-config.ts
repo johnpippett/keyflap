@@ -5,7 +5,8 @@ import { parseArgs } from 'node:util';
 import { TAILSCALE_TOOL } from '@aab/signer/approver-address';
 import { localApiDirProblem } from '@aab/signer/tailscale-localapi';
 import { checkTool, isSha256, OP_TOOL, PASS_CLI_TOOL, type ToolSpec } from '@aab/sources';
-import { buildServiceConfigs } from './config.ts';
+import { buildServiceConfigs, type InstallOptions } from './config.ts';
+import { servicePaths } from './paths.ts';
 
 export function trustedToolSha256(
   path: string,
@@ -61,6 +62,7 @@ export function installConfig(
   warn: (text: string) => void = (t) => {
     process.stderr.write(t);
   },
+  platform: string = process.platform,
 ): { core: string; signer: string; approver: string } {
   const { values } = parseArgs({
     args: argv,
@@ -110,7 +112,7 @@ export function installConfig(
   }
   const xd = values['xvfb-display'];
   if (xd !== undefined && !/^\d{1,3}$/.test(xd)) throw new Error('--xvfb-display must be a number');
-  const { core, signer, approver } = buildServiceConfigs({
+  const options: InstallOptions = {
     ...(values.xvfb ? { xvfbBin: values.xvfb } : {}),
     ...(xd !== undefined ? { xvfbDisplay: Number(xd) } : {}),
     ...(values['ephemeral-browser'] === true ? { ephemeralBrowser: true } : {}),
@@ -161,7 +163,8 @@ export function installConfig(
     ...(values['tailscale-localapi']
       ? { tailscaleLocalApi: rootOnlyDir(values['tailscale-localapi']) }
       : {}),
-  });
+  };
+  const { core, signer, approver } = buildServiceConfigs(options, servicePaths(platform), platform);
   const corePath = join(outDir, 'core.json');
   const signerPath = join(outDir, 'signer.json');
   writeAtomic(corePath, `${JSON.stringify(core, null, 2)}\n`);

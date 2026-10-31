@@ -2534,9 +2534,12 @@ written on Linux. It was first run on a real Mac on 2026-10-29: see "Run on a re
   behaviour is unchanged except that a too-long path is now an error instead of a socket
   somewhere else. Tests: `signer/test/platform.test.ts`, `core/test/socket-path.test.ts`,
   `cli/test/daemon-socket-path.test.ts`.
-- **Tests use `/tmp` on macOS.** `vitest.setup.ts` (both projects) sets `TMPDIR=/tmp` on
-  darwin, so test data dirs and sockets stay short there; spawned daemons and signers
-  inherit it. Linux is untouched. The product never shortens a path itself. Budget check
+- **Tests use `/private/tmp` on macOS.** `vitest.setup.ts` (both projects) sets
+  `TMPDIR=/private/tmp` on darwin, so test data dirs and sockets stay short there; spawned
+  daemons and signers inherit it. Not `/tmp`: on macOS that is a symbolic link to
+  `/private/tmp`, and the root-only path checks (Tailscale's LocalAPI directory, the
+  `localapi_problem` shell check) refuse a path with a link on the way before they look at
+  owners and modes, so tests of those checks would see the wrong refusal. Linux is untouched. The product never shortens a path itself. Budget check
   without the override: the whole suite passed on Linux with a 58-byte `TMPDIR` (against
   Linux's 108 bytes, about as tight as a 54-byte tmpdir against macOS's 103; macOS's is ~50).
 - **Service mode refuses to start off Linux.** `serviceModeUnsupported()` in
