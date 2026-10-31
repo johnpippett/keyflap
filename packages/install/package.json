@@ -1,0 +1,11 @@
+{
+  "name": "@aab/install",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "description": "Service-mode installers (Linux: systemd units, system users, root-owned prefix; macOS: keyflap-launch, the launchd socket handover). No runtime code.",
+  "scripts": {
+    "bundle": "bash linux/build-bundle.sh"
+  }
+}

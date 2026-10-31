@@ -1,0 +1,31 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": { "includes": ["**", "!**/node_modules", "!docs", "!ios"] },
+  "formatter": { "enabled": true, "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
+  "javascript": { "formatter": { "quoteStyle": "single", "semicolons": "always" } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "suspicious": { "noConsole": { "level": "error", "options": { "allow": ["error", "warn"] } } }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["packages/*/test/**"],
+      "linter": {
+        "rules": { "suspicious": { "noSkippedTests": "error", "noFocusedTests": "error" } }
+      }
+    },
+    {
+      "includes": [
+        "packages/*/test/**",
+        "packages/test-rp/**",
+        "packages/*/src/main.ts",
+        ".claude/skills/*/scripts/**"
+      ],
+      "linter": { "rules": { "suspicious": { "noConsole": "off" } } }
+    }
+  ]
+}

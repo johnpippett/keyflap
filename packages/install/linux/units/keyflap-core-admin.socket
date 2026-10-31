@@ -1,0 +1,18 @@
+# The core's admin socket (D3): `sudo keyflap agent|password|approver pair|status`.
+# root:root 0600, so only root can connect (Node has no SO_PEERCRED; the socket's owner
+# and mode are the check, and systemd sets them before the core ever runs).
+[Unit]
+Description=Keyflap broker admin socket (root only)
+
+[Socket]
+ListenStream=/run/keyflap/admin.sock
+FileDescriptorName=admin
+SocketUser=root
+SocketGroup=root
+SocketMode=0600
+DirectoryMode=0755
+RemoveOnStop=yes
+Service=keyflap-core.service
+
+[Install]
+WantedBy=sockets.target

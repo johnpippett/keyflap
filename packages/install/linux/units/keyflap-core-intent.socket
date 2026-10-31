@@ -1,0 +1,18 @@
+# The intent socket (section 8): the user's Claude Code hook forwards each typed prompt
+# here. Owned by the installing user, 0600, so only their processes can connect; the
+# host token (their copy in /var/lib/keyflap/hook) is checked as well.
+[Unit]
+Description=Keyflap broker intent socket (@USER@ only)
+
+[Socket]
+ListenStream=/run/keyflap/intent.sock
+FileDescriptorName=intent
+SocketUser=@USER@
+SocketGroup=root
+SocketMode=0600
+DirectoryMode=0755
+RemoveOnStop=yes
+Service=keyflap-core.service
+
+[Install]
+WantedBy=sockets.target

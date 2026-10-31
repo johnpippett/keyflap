@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keyflap broker approver front: serves the phone approver page from the root-owned install
+     and forwards /api/* to the core, filtering what comes back (docs/APPROVER_INTEGRITY_PLAN.md).
+     The core never serves the page, so a compromised core can't change what the phone runs.
+     Installed by packages/install/macos/install.sh, which fills in the listen address.
+     launchd (root) binds the listener and holds it while the front restarts, so the core (or
+     anyone else) can never take this port and serve its own page (inv5). With the default
+     127.0.0.1 it holds ::1 too: another uid could otherwise bind the IPv6 twin and answer
+     whoever dials localhost. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.keyflap.approver</string>
+  <key>UserName</key><string>_keyflap-web</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/keyflap/libexec/keyflap-launch</string>
+    <string>--socket</string><string>approver</string>
+    <!-- @V6: start -->
+    <string>--socket</string><string>approver6</string>
+    <!-- @V6: end -->
+    <string>--</string>
+    <string>/opt/keyflap/node/bin/node</string>
+    <string>--disable-warning=ExperimentalWarning</string>
+    <string>/opt/keyflap/app/packages/cli/src/service/approver-main.ts</string>
+    <string>--config</string><string>/Library/Keyflap/etc/approver.json</string>
+  </array>
+  <key>Sockets</key>
+  <dict>
+    <key>approver</key>
+    <dict>
+      <key>SockNodeName</key><string>@LISTEN_HOST@</string>
+      <key>SockServiceName</key><string>@LISTEN_PORT@</string>
+      <key>SockFamily</key><string>@LISTEN_FAMILY@</string>
+      <key>SockType</key><string>stream</string>
+    </dict>
+    <!-- @V6: start -->
+    <key>approver6</key>
+    <dict>
+      <key>SockNodeName</key><string>::1</string>
+      <key>SockServiceName</key><string>@LISTEN_PORT@</string>
+      <key>SockFamily</key><string>IPv6</string>
+      <key>SockType</key><string>stream</string>
+    </dict>
+    <!-- @V6: end -->
+  </dict>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CREDENTIALS_DIRECTORY</key><string>/Library/Keyflap/credentials/approver</string>
+    <key>HOME</key><string>/Library/Keyflap/data/approver</string>
+    <key>TMPDIR</key><string>/Library/Keyflap/data/approver/tmp</string>
+    <key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>WorkingDirectory</key><string>/Library/Keyflap/data/approver</string>
+  <key>Umask</key><integer>63</integer>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key><false/>
+  </dict>
+  <key>ThrottleInterval</key><integer>2</integer>
+  <key>ExitTimeOut</key><integer>30</integer>
+  <!-- No core dumps: they would hold whatever secrets were in memory. -->
+  <key>HardResourceLimits</key>
+  <dict>
+    <key>Core</key><integer>0</integer>
+  </dict>
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>Core</key><integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key><string>/Library/Keyflap/log/approver/approver.log</string>
+  <key>StandardErrorPath</key><string>/Library/Keyflap/log/approver/approver.log</string>
+</dict>
+</plist>

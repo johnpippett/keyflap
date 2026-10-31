@@ -1,0 +1,26 @@
+# CI job for the isolation suite: paste under `jobs:` in .github/workflows/ci.yml.
+# Not used for now: the suite runs locally before each push (CLAUDE.md), to save CI minutes.
+# Not committed there because pushing workflow files needs a token with the `workflow`
+# scope. The main `check` job stays as it is. Docker on ubuntu-latest (the harness runs the
+# container privileged with a private cgroup namespace, the usual recipe for systemd in
+# docker); locally the suite uses rootless podman.
+  isolation:
+    # Service mode (docs/ISOLATION_PLAN.md): installs into a throwaway systemd container
+    # and probes it as an ordinary uid (invariants 1, 7, 9). Docker on the runner.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+      KEYFLAP_ISOLATION_RUNTIME: docker
+      KEYFLAP_ISOLATION_REQUIRED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Playwright Chromium (copied into the container's /opt/keyflap)
+        run: pnpm --filter @aab/shim exec playwright install chromium
+      - run: pnpm test:isolation

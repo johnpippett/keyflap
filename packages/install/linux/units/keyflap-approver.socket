@@ -1,0 +1,14 @@
+# The phone approver's listener (docs/APPROVER_INTEGRITY_PLAN.md). Bound by systemd (root)
+# and held for as long as this unit is enabled, even while keyflap-approver.service restarts,
+# so the core (or anyone else) can never take this port and serve its own page. Point
+# `tailscale serve` (or your TLS proxy) here. install.sh fills in the address.
+[Unit]
+Description=Keyflap broker approver page listener
+
+[Socket]
+ListenStream=@LISTEN@
+FileDescriptorName=approver
+Service=keyflap-approver.service
+
+[Install]
+WantedBy=sockets.target

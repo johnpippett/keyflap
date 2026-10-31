@@ -1,0 +1,6 @@
+name: keyflap-intent
+version: "0.1.0"
+description: "Records the owner's own direct messages as live intents for the Keyflap sign-in broker (runs `keyflap hook hermes`; never changes or consumes a message)."
+author: "Keyflap"
+provides_hooks:
+  - post_gateway_admission

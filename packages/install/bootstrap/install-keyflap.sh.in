@@ -1,0 +1,633 @@
+#!/bin/bash
+# Keyflap, the one-command install (service mode, macOS on Apple silicon and Linux).
+# Generated for Keyflap @KEYFLAP_VERSION@ by packages/install/bootstrap/make-bootstrap.sh, which pins
+# the SHA-256 of each of that release's tarballs below. Run it the way keyflap.com shows:
+#
+#   curl -fsSL https://github.com/johnpippett/keyflap/releases/latest/download/install-keyflap.sh | sudo bash
+#
+# As root it picks the tarball for this machine, downloads it into a fresh root-only directory,
+# checks it against the pinned SHA-256 before extracting anything, finds the phone approver origin
+# (Tailscale), runs that release's install.sh, then `keyflap setup` on this terminal. It reads
+# its answers from /dev/tty, never from stdin (that is the download). As root it runs nothing from
+# your PATH or your home, and nothing someone other than root can change: a Tailscale CLI that
+# isn't root-only (the Mac app, in the admin-writable /Applications) runs as you.
+#
+#   bash install-keyflap.sh --dry-run    # as anyone: download, check and unpack in a temporary
+#                                        # directory, print the install command, install nothing
+#
+# The simple Mac install runs as you, with no admin password, and protects less; it says so and
+# asks before it downloads anything (docs/integrations/simple-mac-install.md):
+#
+#   curl -fsSL https://github.com/johnpippett/keyflap/releases/latest/download/install-keyflap.sh | bash -s -- --simple
+#
+# KEYFLAP_RELEASE_BASE=http://127.0.0.1:PORT is for tests (a fake release on this machine); it is
+# refused unless it is a loopback http URL, and the pinned hashes still decide what is accepted.
+# docs/IMPLEMENTATION_NOTES.md, "Agent-led setup and the one-command install".
+
+main() {
+  set -euo pipefail
+  umask 022
+
+  local version='@KEYFLAP_VERSION@'
+  local release_base='https://github.com/johnpippett/keyflap/releases/download'
+  local one_command='curl -fsSL https://github.com/johnpippett/keyflap/releases/latest/download/install-keyflap.sh | sudo bash'
+  local simple_command='curl -fsSL https://github.com/johnpippett/keyflap/releases/latest/download/install-keyflap.sh | bash -s -- --simple'
+  local release_dir=/opt/keyflap-release
+  local approver_port=8766
+
+  local dry_run=0 simple=0
+  while [ $# -gt 0 ]; do
+    case $1 in
+      --dry-run) dry_run=1 ;;
+      --simple) simple=1 ;;
+      -h|--help)
+        say "usage: $one_command"
+        say "       $simple_command    # Mac, no admin password, protects less"
+        say "       bash install-keyflap.sh [--simple] --dry-run"
+        return 0 ;;
+      *) die "unknown option $1 (the options are --simple and --dry-run)" ;;
+    esac
+    shift
+  done
+
+  if [ "$EUID" -eq 0 ]; then
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    export PATH
+  fi
+  unset CURL_HOME TAR_OPTIONS XZ_DEFAULTS XZ_OPT BASH_ENV ENV
+
+  local os arch
+  detect_platform
+  local key="$os-$arch"
+  local name="keyflap-$version-$key"
+  local asset="$name.tar.xz"
+  local pinned
+  pinned=$(pinned_sha256 "$key") ||
+    die "Keyflap $version has no build for $(platform_label "$key"). Supported: $(pinned_keys)."
+
+  if [ "$os" = linux ] && ! command -v xz >/dev/null 2>&1; then
+    die "it needs xz to unpack the download (Debian, Ubuntu: apt install xz-utils; Fedora: dnf install xz)"
+  fi
+
+  local base=$release_base proto='=https'
+  if [ -n "${KEYFLAP_RELEASE_BASE:-}" ]; then
+    local loopback='^http://(127\.0\.0\.1|\[::1\]):[0-9]{1,5}(/[A-Za-z0-9._~/-]*)?$'
+    [[ $KEYFLAP_RELEASE_BASE =~ $loopback ]] ||
+      die "KEYFLAP_RELEASE_BASE is only for tests and must be http://127.0.0.1:PORT or http://[::1]:PORT"
+    base=${KEYFLAP_RELEASE_BASE%/}
+    proto='=http'
+  fi
+
+  if [ $simple -eq 1 ]; then
+    [ "$EUID" -ne 0 ] || die "the simple install runs as you, without sudo. Run it like this:
+  $simple_command
+The full install, which protects more, is the one that uses sudo:
+  $one_command"
+    [ "$os" = darwin ] || die "the simple install is for Macs. On Linux, use the full install:
+  $one_command"
+    [ ! -f /Library/LaunchDaemons/com.keyflap.core.plist ] ||
+      die "the full install is already on this Mac; the simple one would run a second broker next to it."
+    if [ $dry_run -eq 0 ]; then
+      have_tty || die "it needs a terminal to ask you first. Run it in a terminal window:
+  $simple_command"
+      simple_notice
+      confirm "Install the simple version anyway?" n || die "stopped. Nothing was installed."
+    fi
+  elif [ $dry_run -eq 0 ]; then
+    [ "$EUID" -eq 0 ] || die "it installs system services, so it needs root. Run it exactly as shown:
+  $one_command
+On a Mac, the simple install runs as you without sudo, and protects less:
+  $simple_command"
+    [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ] ||
+      die "run it with sudo from your own account (the one your agents run as), not from a root shell:
+  $one_command"
+    have_tty || die "it needs a terminal to ask you a few things. Run it in a terminal window:
+  $one_command"
+    [ "$os" != darwin ] || simple_install_absent "$SUDO_USER"
+  fi
+
+  progress_init "install · $version"
+  progress_note "Keyflap $version for $(platform_label "$key")."
+
+  local work
+  if [ $dry_run -eq 1 ]; then
+    work=$(mktemp -d "${TMPDIR:-/tmp}/keyflap-dry-run.XXXXXX")
+  elif [ $simple -eq 1 ]; then
+    work=$(mktemp -d "${TMPDIR:-/tmp}/keyflap-simple.XXXXXX")
+  else
+    prepare_release_dir
+    work=$(mktemp -d "$release_dir/.download.XXXXXX")
+  fi
+  cleanup_dir=$work
+  trap cleanup EXIT
+  local url="$base/v$version/$asset"
+
+  if [ $simple -eq 1 ]; then
+    fetch_release 1000
+    progress_finish "Downloaded and checked Keyflap $version"
+    local app="$HOME/Library/Application Support/Keyflap"
+    if [ $dry_run -eq 1 ]; then
+      say_command "Would run: $work/$name/install-simple.sh --confirmed"
+      say_command "Then:      '$app/bin/keyflap' setup"
+      say "Dry run: stopped before installing. Nothing was installed."
+      return 0
+    fi
+    "$work/$name/install-simple.sh" --confirmed </dev/tty
+    say ""
+    say "Installed. Now the guided setup: your phone, your agent and your passwords."
+    "$app/bin/keyflap" setup </dev/tty >/dev/tty 2>&1
+    say ""
+    say_command "To remove Keyflap later: '$app/uninstall.sh'"
+    return 0
+  fi
+
+  local installed=0 conf="$release_dir/bootstrap.conf"
+  service_installed && installed=1
+  local conf_origin='' conf_source='' conf_vault='' origin='' connected=''
+
+  if [ $dry_run -eq 1 ]; then
+    fetch_release 1000
+    progress_finish "Downloaded and checked Keyflap $version"
+    find_origin
+    [ -n "$origin" ] || say "No approver origin found: the installer would ask for one."
+    say "Existing service-mode install: $([ $installed -eq 1 ] && echo yes || echo no)."
+    say_command "Would run: $release_dir/$name/install.sh --approver-origin ${origin:-<origin>}"
+    say_command "Then:      /usr/local/bin/keyflap setup"
+    say "Dry run: stopped before installing. Nothing was installed."
+    return 0
+  fi
+
+  if [ $installed -eq 1 ]; then
+    [ -f "$conf" ] || die "Keyflap is already installed here, and not by this installer. Upgrading would
+rewrite its settings from fewer options than you installed with. Upgrade with the new release's
+install.sh and your own options instead (docs/integrations/service-mode.md):
+  $release_dir/$name/install.sh"
+    read_conf "$conf"
+    read_connected
+  fi
+  find_origin
+
+  while [ -z "$origin" ]; do
+    say ""
+    say "Your phone approves sign-ins on a web page this computer serves. It needs an HTTPS"
+    say "address your phone can reach. The easy way is Tailscale on this computer and your phone,"
+    say "with MagicDNS and HTTPS certificates turned on (tailscale.com). Then run this again."
+    ask "Or type the address now (https://host:port; blank to stop)" ''
+    [ -n "$answer" ] || die "stopped: no approver origin. Nothing was installed."
+    if valid_origin "$answer"; then origin=$answer; else say "  Not an https://host[:port] origin."; fi
+  done
+
+  local pw_source='' pw_choice=none disconnect=0
+  choose_password_source
+  local vault=''
+  if [ -n "$pw_source" ] && [ "$pw_source" != "$connected" ]; then
+    ask "Vault for your agents (blank: every vault it can see)" "$conf_vault"
+    vault=$answer
+  fi
+
+  local headless=0
+  if [ "$os" = linux ]; then
+    if ! command -v Xvfb >/dev/null 2>&1 && [ ! -x /usr/bin/Xvfb ]; then
+      say ""
+      say "Xvfb is not installed. Keyflap runs its browser on a hidden screen (Xvfb), because many"
+      say "sites refuse headless browsers. Install it (Debian, Ubuntu: apt install xvfb; Fedora:"
+      say "dnf install xorg-x11-server-Xvfb) and run this again, or go on without it."
+      confirm "Go on with a headless browser?" y || die "stopped. Nothing was installed."
+      headless=1
+    fi
+  fi
+
+  local args=(--approver-origin "$origin")
+  source_args
+  [ $headless -eq 0 ] || args+=(--headless)
+
+  fetch_release "$handed_over"
+  rm -rf "${release_dir:?}/$name"
+  mv "$work/$name" "$release_dir/$name"
+
+  if [ $pg_view -eq 0 ]; then say ""; fi
+  progress_note "Installing Keyflap $version for $SUDO_USER:"
+  progress_note "  $release_dir/$name/install.sh ${args[*]}"
+  progress_hand_over "Checking this computer"
+  if [ $pg_view -eq 1 ]; then
+    KEYFLAP_PROGRESS_FROM=$handed_over "$release_dir/$name/install.sh" "${args[@]}" </dev/tty
+    keep_log "$(keyflap_install_log "$os")"
+  else
+    "$release_dir/$name/install.sh" "${args[@]}" </dev/tty
+  fi
+
+  {
+    printf 'origin=%s\n' "$origin"
+    printf 'password_source=%s\n' "${pw_source:-$pw_choice}"
+    printf 'vault=%s\n' "$vault"
+  } >"$conf.tmp"
+  mv "$conf.tmp" "$conf"
+
+  say ""
+  if [ $pg_view -eq 1 ]; then
+    say "Now the guided setup: your phone, your agent and your passwords."
+  else
+    say "Installed. Now the guided setup: your phone, your agent and your passwords."
+  fi
+  /usr/local/bin/keyflap setup </dev/tty >/dev/tty 2>&1
+  say ""
+  say_command "To remove Keyflap later: sudo $release_dir/$name/uninstall.sh"
+}
+
+# The part of the bar the download fills before install.sh takes over (per mille).
+handed_over=250
+
+# fetch_release TO: downloads the tarball, checks it against the pinned SHA-256 and unpacks it in
+# $work, moving the bar up to TO per mille.
+fetch_release() {
+  progress_start 3 "$work/install.log" "$1"
+  pg_log_shown=0
+  progress_step 'Downloading Keyflap' ''
+  progress_note "Downloading $url"
+  if [ $pg_view -eq 1 ]; then
+    progress_watch curl "$work/download.progress"
+    curl -q -fL --proto "$proto" --proto-redir "$proto" --tlsv1.2 --retry 3 \
+      -o "$work/$asset" "$url" </dev/null 2>"$work/download.progress" ||
+      die "the download failed; nothing was installed
+$(tr '\r' '\n' <"$work/download.progress" | grep '^curl:' || true)"
+  else
+    local progress=-sS
+    [ -t 2 ] && progress=-#
+    curl -q -fL "$progress" --proto "$proto" --proto-redir "$proto" --tlsv1.2 --retry 3 \
+      -o "$work/$asset" "$url" </dev/null || die "the download failed; nothing was installed"
+  fi
+
+  progress_step 'Checking the download' ''
+  local actual
+  actual=$(sha256_of "$work/$asset")
+  if [ "$actual" != "$pinned" ]; then
+    rm -f "$work/$asset"
+    die "$asset does not match the SHA-256 pinned in this installer, so it was deleted unopened.
+  expected $pinned
+  got      $actual
+Nothing was installed. Try again later, and report it if it keeps happening:
+  https://github.com/johnpippett/keyflap/blob/main/SECURITY.md"
+  fi
+  progress_note "Checked: $asset matches the pinned SHA-256."
+
+  progress_step 'Unpacking' ''
+  tar -xJf "$work/$asset" -C "$work" </dev/null
+  rm -f "$work/$asset"
+  [ -f "$work/$name/install.sh" ] && [ ! -L "$work/$name/install.sh" ] ||
+    die "$asset has no $name/install.sh"
+  if [ $simple -eq 1 ]; then
+    [ -f "$work/$name/install-simple.sh" ] && [ ! -L "$work/$name/install-simple.sh" ] ||
+      die "$asset has no $name/install-simple.sh"
+  fi
+}
+
+# find_origin: sets origin to the approver origin kept from the last install or Tailscale's name
+# for this computer, or to nothing.
+find_origin() {
+  if [ -n "$conf_origin" ]; then
+    origin=$conf_origin
+    progress_note "Phone approver: $origin (kept from your install)."
+  elif origin=$(tailscale_origin); then
+    progress_note "Phone approver: $origin (this computer's Tailscale name)."
+  else
+    origin=''
+  fi
+}
+
+# keep_log FILE: adds this script's log to install.sh's (FILE), in a directory only root can change.
+keep_log() {
+  local dir om
+  dir=$(dirname -- "$1")
+  [ -d "$dir" ] && [ ! -L "$dir" ] && [ ! -L "$1" ] && [ -f "$1" ] || return 0
+  om=$(owner_mode "$dir") || return 0
+  [ "${om%% *}" = 0 ] && (( (8#${om##* } & 8#022) == 0 )) || return 0
+  cat "$pg_log" >>"$1"
+}
+
+die() {
+  progress_fail "keyflap install: $*"
+  exit 1
+}
+
+simple_notice() {
+  cat >/dev/tty <<EOF
+
+Keyflap, the simple install (no admin password).
+
+The simple install protects less: an agent that can run commands as you can read Keyflap's files and change its code. The full install stops that.
+
+It runs as you, from ~/Library/Application Support/Keyflap, and keeps its keys in ~/.keyflap,
+unlocked by a key file there. The full install needs your admin password once:
+  $one_command
+
+EOF
+}
+
+simple_install_absent() {
+  local home
+  home=$(dscl . -read "/Users/$1" NFSHomeDirectory 2>/dev/null | sed -n 's/^NFSHomeDirectory: //p')
+  [ -n "$home" ] || return 0
+  local app="$home/Library/Application Support/Keyflap"
+  if [ -f "$home/Library/LaunchAgents/com.keyflap.simple.plist" ] || [ -d "$app" ]; then
+    die "$1 has the simple install of Keyflap. Remove it first, as $1 and without sudo:
+  '$app/uninstall.sh'
+then run this again. Nothing moves across: the full install starts a new key store, so you pair your
+phone again and add your logins again. The uninstaller keeps ~/.keyflap until you pass --purge."
+  fi
+}
+
+# say TEXT: a line for the person: plain, or in the view's column on a terminal, wrapped to it.
+# say_command TEXT: the same for a line that ends in a command, never wrapped, so it copies whole.
+say() {
+  if [ "$pg_view" -eq 1 ] && [ "$pg_active" -eq 0 ]; then progress_say "$*"; else printf '%s\n' "$*"; fi
+}
+
+say_command() {
+  if [ "$pg_view" -eq 1 ] && [ "$pg_active" -eq 0 ]; then printf '     %s\n' "$*"; else printf '%s\n' "$*"; fi
+}
+
+cleanup_dir=''
+cleanup() {
+  progress_exit $?
+  [ -z "$cleanup_dir" ] || rm -rf "$cleanup_dir"
+}
+
+pinned_sha256() {
+  case $1 in
+@KEYFLAP_PINS@
+    *) return 1 ;;
+  esac
+}
+
+pinned_keys() {
+  local k out=''
+  for k in darwin-arm64 linux-x64 linux-arm64; do
+    if pinned_sha256 "$k" >/dev/null; then out="${out:+$out, }$(platform_label "$k")"; fi
+  done
+  printf '%s' "$out"
+}
+
+platform_label() {
+  case $1 in
+    darwin-arm64) printf 'macOS on Apple silicon' ;;
+    linux-x64) printf 'Linux on x86_64' ;;
+    linux-arm64) printf 'Linux on arm64' ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+detect_platform() {
+  local s m
+  s=$(uname -s)
+  m=$(uname -m)
+  case $s in
+    Linux) os=linux ;;
+    Darwin) os=darwin ;;
+    *) die "Keyflap runs on macOS (Apple silicon) and Linux, not $s." ;;
+  esac
+  case $m in
+    x86_64|amd64) arch=x64 ;;
+    aarch64|arm64) arch=arm64 ;;
+    *) die "Keyflap needs an x86_64 or arm64 processor, not $m." ;;
+  esac
+  if [ "$os" = darwin ] && [ "$arch" = x64 ]; then
+    if [ "$(sysctl -n hw.optional.arm64 2>/dev/null || true)" = 1 ]; then
+      arch=arm64
+    else
+      die "Intel Macs are not supported yet. Keyflap runs on Macs with Apple silicon (M1 or later)."
+    fi
+  fi
+}
+
+sha256_of() {
+  local out
+  if command -v sha256sum >/dev/null 2>&1; then
+    out=$(sha256sum "$1")
+  elif command -v shasum >/dev/null 2>&1; then
+    out=$(shasum -a 256 "$1")
+  else
+    out=$(openssl dgst -sha256 -r "$1")
+  fi
+  printf '%s' "${out%% *}" | tr 'A-F' 'a-f'
+}
+
+owner_mode() {
+  stat -c '%u %a' -- "$1" 2>/dev/null || stat -f '%u %Mp%Lp' -- "$1"
+}
+
+trusted() {
+  local real d om uid mode me
+  me=$(id -u)
+  real=$(readlink -f -- "$1" 2>/dev/null) || return 1
+  [ -e "$real" ] || return 1
+  d=$real
+  while :; do
+    om=$(owner_mode "$d") || return 1
+    uid=${om%% *}
+    mode=${om##* }
+    [ "$uid" = 0 ] || [ "$uid" = "$me" ] || return 1
+    if (( (8#$mode & 8#022) != 0 )); then
+      [ "$d" != "$real" ] && [ -d "$d" ] && (( (8#$mode & 8#1000) != 0 )) || return 1
+    fi
+    [ "$d" = / ] && break
+    d=$(dirname -- "$d")
+  done
+}
+
+prepare_release_dir() {
+  [ -d /opt ] || mkdir -m 0755 /opt
+  [ ! -L "$release_dir" ] || die "$release_dir is a symbolic link; remove it and run this again"
+  [ -d "$release_dir" ] || mkdir -m 0755 "$release_dir"
+  trusted "$release_dir" ||
+    die "$release_dir must be owned by root and writable only by root (anything else could be changed before root runs it)"
+}
+
+service_installed() {
+  case $os in
+    linux) [ -f /etc/systemd/system/keyflap-core.service ] ;;
+    darwin) [ -f /Library/LaunchDaemons/com.keyflap.core.plist ] ;;
+  esac
+}
+
+read_conf() {
+  [ ! -L "$1" ] && trusted "$1" || die "$1 is not root-only; remove it and run this again"
+  local k v
+  while IFS='=' read -r k v; do
+    case $k in
+      origin) valid_origin "$v" && conf_origin=$v ;;
+      password_source) case $v in proton-pass|1password|import|none) conf_source=$v ;; esac ;;
+      vault) conf_vault=$v ;;
+    esac
+  done <"$1"
+}
+
+# read_connected [CONFIG]: the password manager connected now (proton-pass, 1password or nothing), from
+# the installed settings. It can differ from bootstrap.conf: the console and
+# `keyflap password-source add` change it without this installer.
+read_connected() {
+  connected=''
+  local cfg=${1:-}
+  if [ -z "$cfg" ]; then
+    cfg=/etc/keyflap/signer.json
+    if [ "$os" = darwin ]; then cfg=/Library/Keyflap/etc/signer.json; fi
+  fi
+  [ -f "$cfg" ] && [ ! -L "$cfg" ] && trusted "$cfg" || return 0
+  if grep -Eq '"protonPass": *[{]' "$cfg"; then connected=proton-pass
+  elif grep -Eq '"onePassword": *[{]' "$cfg"; then connected=1password
+  fi
+  if [ -n "$connected" ]; then
+    conf_source=$connected
+  else
+    case $conf_source in proton-pass|1password) conf_source=none ;; esac
+  fi
+}
+
+valid_origin() {
+  local re='^https://[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+(:[0-9]{1,5})?$'
+  [[ $1 =~ $re ]]
+}
+
+tailscale_status() {
+  local c
+  for c in "$(command -v tailscale 2>/dev/null || true)" \
+    /Applications/Tailscale.app/Contents/MacOS/Tailscale /usr/local/bin/tailscale /usr/bin/tailscale; do
+    [ -n "$c" ] && [ -f "$c" ] && [ -x "$c" ] || continue
+    if trusted "$c"; then
+      "$c" status --json --peers=false </dev/null 2>/dev/null || true
+      return 0
+    fi
+    if [ "$EUID" -eq 0 ] && [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != root ]; then
+      sudo -n -u "$SUDO_USER" -- "$c" status --json --peers=false </dev/null 2>/dev/null || true
+      return 0
+    fi
+    say "Not running $c: someone other than you can change it." >&2
+  done
+  return 1
+}
+
+tailscale_origin() {
+  local json state names count dns
+  json=$(tailscale_status) || { say "Tailscale is not installed." >&2; return 1; }
+  state=$(printf '%s\n' "$json" | sed -n 's/.*"BackendState": *"\([^"]*\)".*/\1/p' | head -n 1)
+  if [ "$state" != Running ]; then
+    say "Tailscale is installed but not connected${state:+ ($state)}: open it and sign in." >&2
+    return 1
+  fi
+  names=$(printf '%s\n' "$json" | sed -n 's/.*"DNSName": *"\([^"]*\)".*/\1/p')
+  count=$(printf '%s\n' "$names" | grep -c . || true)
+  dns=$(printf '%s' "$names" | tr 'A-Z' 'a-z')
+  dns=${dns%.}
+  if [ "$count" != 1 ] || ! valid_origin "https://$dns"; then
+    say "Tailscale has no MagicDNS name for this computer: turn on MagicDNS (admin console, DNS)." >&2
+    return 1
+  fi
+  if ! printf '%s\n' "$json" | grep -F -q "\"$dns\""; then
+    say "Tailscale HTTPS certificates are off: turn them on (admin console, DNS, HTTPS Certificates)." >&2
+    return 1
+  fi
+  printf 'https://%s:%s' "$dns" "$approver_port"
+}
+
+have_tty() {
+  { : </dev/tty; } 2>/dev/null
+}
+
+answer=''
+ask() {
+  local indent=''
+  [ "$pg_view" -eq 0 ] || indent='     '
+  if [ -n "$2" ]; then printf '%s%s [%s]: ' "$indent" "$1" "$2" >/dev/tty; else printf '%s%s: ' "$indent" "$1" >/dev/tty; fi
+  IFS= read -r answer </dev/tty || answer=''
+  [ -n "$answer" ] || answer=$2
+}
+
+confirm() {
+  local hint='[y/N]'
+  [ "$2" = y ] && hint='[Y/n]'
+  while :; do
+    ask "$1 $hint" ''
+    case $answer in
+      '') [ "$2" = y ]; return ;;
+      y|Y|yes) return 0 ;;
+      n|N|no) return 1 ;;
+    esac
+  done
+}
+
+tool_present() {
+  local c
+  for c in "/opt/keyflap/tools/$1/$1" "/usr/local/bin/$1" "/usr/bin/$1"; do
+    [ -f "$c" ] && return 0
+  done
+  return 1
+}
+
+# source_args: adds the password manager flags to args. Nothing is passed when the choice is
+# what is connected now, so an upgrade keeps it; --password-source none only when the owner chose
+# to disconnect it.
+source_args() {
+  case $pw_source in
+    proton-pass) if [ "$pw_source" != "$connected" ]; then
+        args+=(--password-source proton-pass)
+        [ -z "$vault" ] || args+=(--proton-pass-vault "$vault")
+      fi ;;
+    1password) if [ "$pw_source" != "$connected" ]; then
+        args+=(--password-source 1password)
+        [ -z "$vault" ] || args+=(--1password-vault "$vault")
+      fi ;;
+    *) [ $disconnect -eq 0 ] || args+=(--password-source none) ;;
+  esac
+}
+
+choose_password_source() {
+  local def=4
+  case $conf_source in
+    1password) def=1 ;;
+    proton-pass) def=2 ;;
+    import) def=3 ;;
+    none) def=4 ;;
+    *)
+      if tool_present op; then def=1
+      elif tool_present pass-cli; then def=2
+      elif [ "$os" = darwin ]; then def=3
+      fi ;;
+  esac
+  say ""
+  say "Which password manager holds the logins your agents should use?"
+  say "  1) 1Password (a service account token; you paste it next, it is not shown)"
+  say "  2) Proton Pass (you log in during setup with a personal access token)"
+  say "  3) Apple Passwords, or another manager's export (you import the file during setup)"
+  case $connected in
+    1password) say "  4) Disconnect 1Password (agents use only the passwords stored in Keyflap)" ;;
+    proton-pass) say "  4) Disconnect Proton Pass (agents use only the passwords stored in Keyflap)" ;;
+    *) say "  4) None for now (passkeys, or passwords you add one by one)" ;;
+  esac
+  while :; do
+    ask "Choice" "$def"
+    case $answer in
+      1) pw_source=1password; break ;;
+      2) pw_source=proton-pass; break ;;
+      3) pw_choice=import; pw_source=$connected; return 0 ;;
+      4)
+        if [ -n "$connected" ]; then
+          local was=1Password
+          [ "$connected" = proton-pass ] && was='Proton Pass'
+          confirm "Disconnect $was? Agents stop using its logins." n || continue
+          disconnect=1
+        fi
+        return 0 ;;
+    esac
+  done
+  local tool=op label=1Password doc=1password
+  [ "$pw_source" = proton-pass ] && { tool=pass-cli; label='Proton Pass'; doc=proton-pass; }
+  if ! tool_present "$tool"; then
+    say "The $label command-line tool ($tool) is not installed where Keyflap trusts it: /usr/local/bin,"
+    say "/usr/bin or /opt/keyflap/tools/$tool/, owned by root. Install it from $label's own download"
+    say "(docs/integrations/$doc.md), then run this command again to add it."
+    if confirm "Go on without $label for now?" y; then pw_source=$connected; else die "stopped. Nothing was installed."; fi
+  fi
+}
+
+@KEYFLAP_PROGRESS@
+
+main "$@"; exit $?

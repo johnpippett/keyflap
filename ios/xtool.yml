@@ -1,0 +1,10 @@
+# xtool app description (docs/integrations/ios-app.md). Change bundleID to one you own
+# (it must match the App ID you register and the --apns-bundle-id you give the broker).
+version: 1
+bundleID: com.example.KeyflapApprover
+product: KeyflapApprover
+infoPath: Info.plist
+iconPath: AppHost/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+# Push needs the paid Apple Developer Program (aps-environment). With a free Apple ID,
+# point this at KeyflapApprover-free.entitlements instead: no push, the app polls while open.
+entitlementsPath: KeyflapApprover.entitlements

@@ -1,0 +1,12 @@
+**/node_modules
+.git
+.claude
+ios
+docs
+**/test-results
+**/coverage
+**/*.log
+**/.keyflap
+**/.aab
+**/*.sqlite
+**/*.sqlite-*

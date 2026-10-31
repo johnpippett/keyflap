@@ -1,0 +1,71 @@
+# Copy to .github/workflows/ios.yml (needs a token with the `workflow` scope to push).
+# Builds the iOS app for the Simulator without signing and runs the Swift core tests on
+# macOS. Runs only when ios/** changes: macOS minutes cost ~10x Linux ones on private
+# repos, so it is one lean job with caches and a 15-minute cap.
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  pull_request:
+    paths: ['ios/**', '.github/workflows/ios.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 15
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: '1'
+      HOMEBREW_NO_INSTALL_CLEANUP: '1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app | grep -v beta | sort -V | tail -1)
+          sudo xcode-select -s "$latest"
+          xcodebuild -version
+          swift --version
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ios/KeyflapApproverCore/.build
+            ios/xcode/build/spm
+          key: ios-spm-${{ runner.os }}-${{ hashFiles('ios/Package.swift', 'ios/KeyflapApproverCore/Package.swift', 'ios/**/Package.resolved') }}
+          restore-keys: ios-spm-${{ runner.os }}-
+
+      - name: Core tests (macOS host; the same tests run on Linux in a swift container)
+        working-directory: ios/KeyflapApproverCore
+        run: swift test
+
+      - name: XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate the Xcode project
+        working-directory: ios/xcode
+        run: xcodegen generate
+
+      - name: Build for the iOS Simulator (no signing)
+        working-directory: ios/xcode
+        run: |
+          xcodebuild build -quiet \
+            -project KeyflapApprover.xcodeproj \
+            -scheme KeyflapApprover \
+            -configuration Debug \
+            -destination 'generic/platform=iOS Simulator' \
+            -clonedSourcePackagesDirPath build/spm \
+            -derivedDataPath build/dd \
+            CODE_SIGNING_ALLOWED=NO
+          app=build/dd/Build/Products/Debug-iphonesimulator/KeyflapApprover.app
+          test -d "$app"
+          plutil -p "$app/Info.plist" | grep -E 'CFBundle(Identifier|DisplayName|Executable)|NSFaceID|NSCamera'

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Needs the paid Apple Developer Program: free provisioning can't carry aps-environment.
+  "development" = APNs sandbox (xtool dev builds; start the broker with apns-sandbox).
+  TestFlight and App Store builds use "production" (the TestFlight workflow sets it).
+-->
+<plist version="1.0">
+<dict>
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

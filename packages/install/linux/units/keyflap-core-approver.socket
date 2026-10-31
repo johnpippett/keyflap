@@ -1,0 +1,18 @@
+# The core's approver API (docs/APPROVER_INTEGRITY_PLAN.md): only the approver front
+# (keyflap-web) connects and forwards the phone's /api/* requests. root:keyflap-web 0660 in
+# /run/keyflap-approver (root:keyflap-web 0750, tmpfiles.d/keyflap.conf): the user and the agent can't.
+[Unit]
+Description=Keyflap broker core approver API socket (approver front only)
+
+[Socket]
+ListenStream=/run/keyflap-approver/api.sock
+FileDescriptorName=approver-api
+SocketUser=root
+SocketGroup=keyflap-web
+SocketMode=0660
+DirectoryMode=0750
+RemoveOnStop=yes
+Service=keyflap-core.service
+
+[Install]
+WantedBy=sockets.target

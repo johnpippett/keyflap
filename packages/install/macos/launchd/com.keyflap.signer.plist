@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keyflap broker signer: key store, approval verification, password-manager CLI.
+     Installed by packages/install/macos/install.sh (docs/integrations/service-mode.md), which
+     fills in the ids. launchd creates the sockets as root with these owners and modes before
+     the signer runs; keyflap-launch hands them over as LISTEN_FDS, as systemd does on Linux.
+     Secrets are 0400 files owned by _keyflap-signer in CREDENTIALS_DIRECTORY (D1). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.keyflap.signer</string>
+  <key>UserName</key><string>_keyflap-signer</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/keyflap/libexec/keyflap-launch</string>
+    <string>--socket</string><string>signer</string>
+    <string>--socket</string><string>signer-admin</string>
+    <string>--</string>
+    <string>/opt/keyflap/node/bin/node</string>
+    <string>--disable-warning=ExperimentalWarning</string>
+    <string>/opt/keyflap/app/packages/signer/src/main.ts</string>
+    <string>--service</string>
+    <string>--config</string><string>/Library/Keyflap/etc/signer.json</string>
+  </array>
+  <key>Sockets</key>
+  <dict>
+    <!-- The core's channel to the signer (invariant 9): only _keyflap-core can connect. -->
+    <key>signer</key>
+    <dict>
+      <key>SockPathName</key><string>/Library/Keyflap/run/signer/signer.sock</string>
+      <key>SockPathOwner</key><integer>@SIGNER_UID@</integer>
+      <key>SockPathGroup</key><integer>@CORE_GID@</integer>
+      <key>SockPathMode</key><integer>432</integer>
+    </dict>
+    <!-- `sudo keyflap approver list|remove`: root only (0600). -->
+    <key>signer-admin</key>
+    <dict>
+      <key>SockPathName</key><string>/Library/Keyflap/run/signer/admin.sock</string>
+      <key>SockPathOwner</key><integer>0</integer>
+      <key>SockPathGroup</key><integer>0</integer>
+      <key>SockPathMode</key><integer>384</integer>
+    </dict>
+  </dict>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CREDENTIALS_DIRECTORY</key><string>/Library/Keyflap/credentials/signer</string>
+    <key>HOME</key><string>/Library/Keyflap/data/signer</string>
+    <key>TMPDIR</key><string>/Library/Keyflap/data/signer/tmp</string>
+    <key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>WorkingDirectory</key><string>/Library/Keyflap/data/signer</string>
+  <key>Umask</key><integer>63</integer>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key><false/>
+  </dict>
+  <key>ThrottleInterval</key><integer>2</integer>
+  <key>ExitTimeOut</key><integer>30</integer>
+  <!-- No core dumps: they would hold whatever secrets were in memory. -->
+  <key>HardResourceLimits</key>
+  <dict>
+    <key>Core</key><integer>0</integer>
+  </dict>
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>Core</key><integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key><string>/Library/Keyflap/log/signer/signer.log</string>
+  <key>StandardErrorPath</key><string>/Library/Keyflap/log/signer/signer.log</string>
+</dict>
+</plist>

@@ -1,0 +1,60 @@
+# Keyflap broker core: MCP endpoint, intents, audit, managed Chromium, phone approver API
+# (the page itself is keyflap-approver.service's).
+# Installed by packages/install/linux/install.sh (docs/integrations/service-mode.md).
+[Unit]
+Description=Keyflap broker core (MCP, intents, managed browser)
+Documentation=file:///opt/keyflap/app/docs/integrations/service-mode.md
+Wants=network-online.target
+Requires=keyflap-signer.socket keyflap-core-intent.socket keyflap-core-admin.socket keyflap-core-approver.socket
+After=network-online.target keyflap-signer.socket keyflap-signer.service keyflap-core-intent.socket keyflap-core-admin.socket keyflap-core-approver.socket
+
+[Service]
+Type=simple
+User=keyflap-core
+Group=keyflap-core
+ExecStart=/opt/keyflap/node/bin/node --disable-warning=ExperimentalWarning /opt/keyflap/app/packages/cli/src/service/core-main.ts --config /etc/keyflap/core.json
+Sockets=keyflap-core-intent.socket keyflap-core-admin.socket keyflap-core-approver.socket
+LoadCredentialEncrypted=channel-key:/etc/keyflap/credentials/channel-key.cred
+LoadCredentialEncrypted=host-token:/etc/keyflap/credentials/host-token.cred
+StateDirectory=keyflap/core
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/keyflap/core
+Environment=HOME=/var/lib/keyflap/core
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/keyflap/browsers
+Restart=on-failure
+RestartSec=2
+# Stop the core first and let it save the agents' browser state and close its Chromium;
+# with the default KillMode=control-group, Chromium got SIGTERM at the same moment and the
+# shutdown save found the browser gone. Leftovers are killed after the core exits.
+KillMode=mixed
+TimeoutStopSec=30
+UMask=0077
+# No core dumps: they would hold whatever secrets were in memory.
+LimitCORE=0
+
+# Sandboxing. Chromium runs here (Playwright starts it without its own sandbox), so the
+# unit's sandbox is what contains a browser exploit: no other uid's files, no home dirs,
+# a private /tmp (which also holds the optional Xvfb display socket), no privileges.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+--- !tapi-tbd
+tbd-version: 4
+targets: [ arm64-macos ]
+install-name: '/usr/lib/libSystem.B.dylib'
+current-version: 1351
+exports:
+  - targets: [ arm64-macos ]
+    symbols: [ ___error, ___stack_chk_fail, ___stack_chk_guard, _close, _dup2, _execv, _fcntl,
+               _getegid, _geteuid, _getgid, _getpid, _getuid,
+               _launch_activate_socket, _setenv, _strerror, _write ]
+...

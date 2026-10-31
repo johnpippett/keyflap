@@ -1,0 +1,48 @@
+name: CI
+
+# GitHub-hosted runners only. The repository is public, and a fork's pull request runs the
+# workflow file it brings, so no self-hosted runner is ever registered to it.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:static
+      - name: Install Chromium for Playwright (with system libraries)
+        run: pnpm --filter @aab/shim exec playwright install --with-deps chromium
+      # nproc ignores a container's cgroup CPU quota.
+      - name: Count the CPUs this job may use
+        run: |
+          cpus=$(nproc)
+          if read -r quota period 2>/dev/null </sys/fs/cgroup/cpu.max && [[ $quota =~ ^[0-9]+$ ]]; then
+            quota_cpus=$(( quota / period ))
+            if (( quota_cpus < 1 )); then quota_cpus=1; fi
+            if (( quota_cpus < cpus )); then cpus=$quota_cpus; fi
+          fi
+          echo "JOB_CPUS=$cpus" >> "$GITHUB_ENV"
+      - run: pnpm test:unit --maxWorkers="$JOB_CPUS"
+        env:
+          KEYFLAP_TEST_SHARED_WORKERS: ${{ github.event_name == 'pull_request' && '1' || '' }}
+      - run: pnpm test:e2e

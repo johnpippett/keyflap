@@ -1,0 +1,6 @@
+.build/
+.swiftpm/
+/xtool/
+/xcode/KeyflapApprover.xcodeproj/
+/xcode/build/
+DerivedData/

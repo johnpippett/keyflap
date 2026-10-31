@@ -1,0 +1,291 @@
+/* The live view is on-brand but must never be mistaken for an approval (brand README, "Live
+   view (not an approval)"). On the phone blue means approve, so this page has no blue at
+   all: ink, steel and paper only. A steel header band with a paper LIVE tag where the
+   approvals page has ink and a blue K tile; the picture in the steel bezel (steel means
+   live); outlined controls and a paper (on paper: ink) primary button, never a blue one.
+   It used to be amber; the brand now has no exception to its palette. */
+@font-face {
+  font-family: "Barlow Condensed";
+  font-weight: 700;
+  font-display: swap;
+  src: url(/brand/barlow-condensed-700.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Barlow";
+  font-weight: 400;
+  font-display: swap;
+  src: url(/brand/barlow-400.woff2) format("woff2");
+}
+@font-face {
+  font-family: "Barlow";
+  font-weight: 600;
+  font-display: swap;
+  src: url(/brand/barlow-600.woff2) format("woff2");
+}
+:root {
+  color-scheme: dark light;
+  --ink: #0a0b0f;
+  --ink-2: #14161d;
+  --ink-3: #1f222b;
+  --steel: #2c303b;
+  --board: #111319;
+  --paper: #f4f5f7;
+  --display: "Barlow Condensed", "Arial Narrow", sans-serif;
+  --body: "Barlow", system-ui, -apple-system, sans-serif;
+  /* Dark first; the scheme-dependent roles. */
+  --fg: var(--paper);
+  --bg: var(--ink);
+  --muted: #9ba1b0;
+  --soft: #c4c8d2;
+  --line: var(--steel);
+  --field: var(--ink-2);
+  --press: var(--ink-3);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --fg: var(--ink);
+    --bg: var(--paper);
+    --muted: #4b5060;
+    --soft: #2c303b;
+    --line: #8a90a0;
+    --field: #fff;
+    --press: #e3e6ee;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  font: 400 17px / 1.45 var(--body);
+  color: var(--fg);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+::selection {
+  background: var(--steel);
+  color: var(--paper);
+}
+:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 3px;
+}
+/* The steel band: the same on both schemes. */
+header {
+  padding: 14px 16px 13px;
+  background: var(--steel);
+  color: var(--paper);
+  border-bottom: 1px solid #000;
+}
+.title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* A paper flap with its hinge line, reading LIVE. */
+.live-tag {
+  flex: none;
+  padding: 4px 7px 3px;
+  border-radius: 2px;
+  background: linear-gradient(var(--paper) 50%, #e3e6ee 50%);
+  color: var(--ink);
+  font: 700 15px / 1 var(--display);
+  letter-spacing: 0.16em;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.25);
+  position: relative;
+}
+.live-tag::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.55);
+}
+h1 {
+  margin: 0;
+  font: 700 22px / 1 var(--display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sub {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: #c4c8d2;
+}
+.sub strong {
+  color: var(--paper);
+  font-weight: 600;
+}
+main {
+  padding: 8px 16px 32px;
+  max-width: 720px;
+}
+#status {
+  color: var(--soft);
+}
+dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 14px;
+}
+dt {
+  padding-top: 1px;
+  /* Small caps, as on the approvals page: the label text itself is unchanged. */
+  font: 700 16px / 1.4 var(--display);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+}
+dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+#host {
+  font-weight: 600;
+}
+.notice,
+.warning {
+  font-size: 14px;
+  margin: 10px 0;
+  color: var(--soft);
+}
+.warning {
+  font-weight: 600;
+  color: var(--fg);
+}
+/* The steel bezel (brand .kf-bezel): the departure board's frame, for anything live. */
+.frame {
+  position: relative;
+  margin: 10px 0;
+  padding: 6px;
+  background: var(--board);
+  border: 7px solid var(--steel);
+  border-image: linear-gradient(165deg, #5a606e, #2a2e38 30%, #454a57 55%, #1f222a 80%, #3b404c) 1;
+  box-shadow:
+    0 20px 40px -24px rgba(0, 0, 0, 0.6),
+    inset 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+/* The zoom window: the stage inside it is moved and scaled (handoff-zoom.js). The page
+   itself never zooms here, so every finger reaches the script. */
+.viewport {
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+}
+.stage {
+  position: relative;
+  transform-origin: 0 0;
+}
+#screen,
+#detail {
+  display: block;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+#screen {
+  width: 100%;
+  height: auto;
+}
+/* The zoomed region, sharper, laid over the same place on the page. */
+#detail {
+  position: absolute;
+  pointer-events: none;
+}
+#detail[hidden] {
+  display: none;
+}
+.hint {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.unavailable {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--board);
+  color: #9ba1b0;
+}
+.unavailable[hidden] {
+  display: none;
+}
+.row {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+  flex-wrap: wrap;
+}
+.row input {
+  flex: 3;
+  min-width: 0;
+  font: inherit;
+  padding: 10px;
+  border-radius: 4px;
+  border: 0;
+  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--field);
+  color: var(--fg);
+}
+/* Outlined steel controls, never blue. */
+button {
+  font: 700 17px / 1 var(--display);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  min-height: 46px;
+  border: 0;
+  border-radius: 4px;
+  padding: 10px 12px;
+  flex: 1;
+  cursor: pointer;
+  background: transparent;
+  color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: background 0.2s;
+}
+button:hover,
+button:active {
+  background: var(--press);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.keys button {
+  flex: 1 0 20%;
+}
+.zoom button {
+  flex: 1;
+  font-size: 22px;
+}
+.zoom #zoom-fit {
+  font-size: 17px;
+}
+/* The one primary action: a paper button on ink, an ink button on paper. */
+#start-button,
+.done {
+  background: var(--fg);
+  color: var(--bg);
+  box-shadow: none;
+  width: 100%;
+}
+#start-button:hover,
+.done:hover {
+  background: var(--soft);
+}
+/* Errors in words, on an inverted strip (the brand's "denied" flap). */
+.error {
+  padding: 10px 12px;
+  border-radius: 4px;
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 600;
+}

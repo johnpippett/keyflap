@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Keyflap approvals</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/brand/icon-192.png" type="image/png" sizes="192x192">
+<link rel="icon" href="/brand/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="Keyflap">
+<meta name="theme-color" content="#0a0b0f">
+<link rel="stylesheet" href="/app.css">
+<script src="/approval-check.js" defer></script>
+<script src="/app.js" defer></script>
+</head>
+<body>
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="icon-check" viewBox="0 0 24 24"><path d="M5 12.5L9.8 17.3L19 7.2" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="square"/></symbol>
+  <symbol id="icon-cross" viewBox="0 0 24 24"><path d="M6 6L18 18M18 6L6 18" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="square"/></symbol>
+</svg>
+<header><img src="/brand/icon.svg" alt=""><h1>Keyflap approvals</h1></header>
+<main>
+  <p id="status" role="status">Loading…</p>
+  <section id="pair" hidden>
+    <p>Pair this phone as the broker's approver. You'll create a passkey for the approver page; every approval will need Face ID, a fingerprint, or your device PIN.</p>
+    <button id="pair-button" type="button">Pair this phone</button>
+  </section>
+  <section id="lost-code" class="card guide" hidden>
+    <h2>This link lost its pairing code</h2>
+    <p>The code is the part of the link after #. Some browsers drop it (Brave on iPhone does), and so does reopening this page in a new tab. Start pairing again on the broker for a new link. On an iPhone, long-press the link the camera shows, tap Copy Link, and open it in Safari.</p>
+  </section>
+  <section id="handoffs" aria-live="polite"></section>
+  <section id="requests" aria-live="polite"></section>
+  <section id="install" class="card guide" hidden>
+    <h2>Add to Home Screen</h2>
+    <p>Notifications only reach the home-screen app. Tap Share, then Add to Home Screen, from this page: iOS copies the pairing into the app only when you add it.</p>
+  </section>
+  <section id="reinstall" class="card guide" hidden>
+    <h2>This app isn't paired</h2>
+    <p>Delete this home-screen app. Open your pairing link in Safari (point the camera at the QR code the broker shows), tap Pair this phone, then Share, Add to Home Screen.</p>
+  </section>
+  <section id="push" hidden>
+    <button id="push-button" type="button">Notify me about new requests</button>
+  </section>
+</main>
+<template id="request-card">
+  <article class="card request">
+    <div class="face">
+      <h2 class="title">Request</h2>
+      <p class="site"></p>
+      <div class="quote">
+        <p class="said-label label">You said</p>
+        <p class="said"></p>
+      </div>
+      <dl class="facts">
+        <dt>Agent</dt><dd class="agent"></dd>
+        <dt>Credential</dt><dd class="credential"></dd>
+        <dt class="allow-label" hidden>Allow-for</dt><dd class="allow" hidden></dd>
+      </dl>
+      <label class="keep" hidden><input class="keep-box" type="checkbox"> <span class="keep-text">Keep me signed in</span></label>
+      <p class="hint" aria-hidden="true">Swipe right to approve, left to deny</p>
+      <span class="stamp yes" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-check"></use></svg></span>
+      <span class="stamp no" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-cross"></use></svg></span>
+    </div>
+    <p class="error" hidden></p>
+    <div class="actions">
+      <button class="deny" type="button" aria-label="Deny"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-cross"></use></svg></button>
+      <button class="approve" type="button" aria-label="Approve"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-check"></use></svg></button>
+    </div>
+  </article>
+</template>
+<template id="handoff-card">
+  <a class="card handoff" href="/handoff">
+    <span class="handoff-title">Human check waiting, open live view</span>
+    <span class="handoff-agent"></span>
+  </a>
+</template>
+</body>
+</html>

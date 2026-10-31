@@ -1,0 +1,18 @@
+{
+  "name": "@aab/cli",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Keyflap admin CLI: daemon, agent registry, agent host hooks.",
+  "bin": {
+    "keyflap": "./src/main.ts"
+  },
+  "dependencies": {
+    "@aab/approver": "workspace:*",
+    "@aab/core": "workspace:*",
+    "@aab/mcp": "workspace:*",
+    "@aab/signer": "workspace:*",
+    "@aab/sources": "workspace:*"
+  }
+}

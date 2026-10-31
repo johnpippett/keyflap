@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Keyflap broker core: MCP endpoint, intents, audit, managed Chromium (headless, its own
+     sandbox on), phone approver API (the page itself is com.keyflap.approver's).
+     Installed by packages/install/macos/install.sh (docs/integrations/service-mode.md), which
+     fills in the ids. launchd creates the sockets as root with these owners and modes before
+     the core runs; keyflap-launch hands them over as LISTEN_FDS, as systemd does on Linux. -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.keyflap.core</string>
+  <key>UserName</key><string>_keyflap-core</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/keyflap/libexec/keyflap-launch</string>
+    <string>--socket</string><string>intent</string>
+    <string>--socket</string><string>admin</string>
+    <string>--socket</string><string>approver-api</string>
+    <string>--</string>
+    <string>/opt/keyflap/node/bin/node</string>
+    <string>--disable-warning=ExperimentalWarning</string>
+    <string>/opt/keyflap/app/packages/cli/src/service/core-main.ts</string>
+    <string>--config</string><string>/Library/Keyflap/etc/core.json</string>
+  </array>
+  <key>Sockets</key>
+  <dict>
+    <!-- The intent socket (section 8): the owner's Claude Code hook forwards each typed
+         prompt here. Owned by the installing user, 0600, so only their processes connect. -->
+    <key>intent</key>
+    <dict>
+      <key>SockPathName</key><string>/Library/Keyflap/run/core/intent.sock</string>
+      <key>SockPathOwner</key><integer>@USER_UID@</integer>
+      <key>SockPathGroup</key><integer>0</integer>
+      <key>SockPathMode</key><integer>384</integer>
+    </dict>
+    <!-- The admin socket (D3): `sudo keyflap agent|password|approver pair|status`, root only. -->
+    <key>admin</key>
+    <dict>
+      <key>SockPathName</key><string>/Library/Keyflap/run/core/admin.sock</string>
+      <key>SockPathOwner</key><integer>0</integer>
+      <key>SockPathGroup</key><integer>0</integer>
+      <key>SockPathMode</key><integer>384</integer>
+    </dict>
+    <!-- The approver API (docs/APPROVER_INTEGRITY_PLAN.md): only the approver front
+         (_keyflap-web) connects; root:_keyflap-web 0660 in a root:_keyflap-web 0750 dir. -->
+    <key>approver-api</key>
+    <dict>
+      <key>SockPathName</key><string>/Library/Keyflap/run/approver/api.sock</string>
+      <key>SockPathOwner</key><integer>0</integer>
+      <key>SockPathGroup</key><integer>@WEB_GID@</integer>
+      <key>SockPathMode</key><integer>432</integer>
+    </dict>
+  </dict>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>CREDENTIALS_DIRECTORY</key><string>/Library/Keyflap/credentials/core</string>
+    <key>HOME</key><string>/Library/Keyflap/data/core</string>
+    <key>TMPDIR</key><string>/Library/Keyflap/data/core/tmp</string>
+    <key>PLAYWRIGHT_BROWSERS_PATH</key><string>/opt/keyflap/browsers</string>
+    <key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>WorkingDirectory</key><string>/Library/Keyflap/data/core</string>
+  <key>Umask</key><integer>63</integer>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key><false/>
+  </dict>
+  <key>ThrottleInterval</key><integer>2</integer>
+  <!-- 30 s for the core to save the agents' browser state and close its Chromium on stop. -->
+  <key>ExitTimeOut</key><integer>30</integer>
+  <!-- No core dumps: they would hold whatever secrets were in memory. -->
+  <key>HardResourceLimits</key>
+  <dict>
+    <key>Core</key><integer>0</integer>
+  </dict>
+  <key>SoftResourceLimits</key>
+  <dict>
+    <key>Core</key><integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key><string>/Library/Keyflap/log/core/core.log</string>
+  <key>StandardErrorPath</key><string>/Library/Keyflap/log/core/core.log</string>
+</dict>
+</plist>

@@ -1,0 +1,13 @@
+{
+  "name": "@aab/sources",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "External CredentialSource adapters (M3 phase 2). Run inside the signer process; node built-ins only.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./test/fake.ts"
+  },
+  "dependencies": {}
+}

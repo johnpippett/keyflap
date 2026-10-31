@@ -1,0 +1,16 @@
+{
+  "name": "@aab/approver",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Approval transports: terminal prompt (Phase A, development only), the phone web approver (Phase B) and its service-mode front.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./front": "./src/front.ts"
+  },
+  "dependencies": {
+    "@aab/signer": "workspace:*",
+    "@simplewebauthn/server": "14.0.3"
+  }
+}

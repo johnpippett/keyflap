@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+# local broker state (keys, sqlite, sockets) — never commit
+.keyflap/
+.aab/
+*.sqlite
+*.sqlite-*
+test-results/
+.claude/worktrees/

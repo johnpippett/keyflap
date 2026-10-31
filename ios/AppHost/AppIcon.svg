@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <!-- Keyflap approver icon: a shield with a check, on a calm indigo field. Full bleed;
+       iOS applies the rounded mask. Render: ios/scripts/make-icon.sh -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4B63F2"/>
+      <stop offset="1" stop-color="#1E2A8F"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.38" r="0.55">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="shield" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#E4E9FF"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="26" flood-color="#0B1150" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+  <path filter="url(#shadow)" fill="url(#shield)"
+        d="M512 182 C 590 230 680 256 778 262 C 790 262 800 272 800 284 L 800 500
+           C 800 676 690 790 524 852 C 516 855 508 855 500 852
+           C 334 790 224 676 224 500 L 224 284 C 224 272 234 262 246 262
+           C 344 256 434 230 512 182 Z"/>
+  <path d="M392 520 L 482 610 L 650 432" fill="none" stroke="#3446D8" stroke-width="64"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,54 @@
+# Keyflap broker signer: key store, approval verification, password-manager CLI.
+# Installed by packages/install/linux/install.sh (docs/integrations/service-mode.md).
+[Unit]
+Description=Keyflap broker signer (keys, approval verification)
+Documentation=file:///opt/keyflap/app/docs/integrations/service-mode.md
+Requires=keyflap-signer.socket keyflap-signer-admin.socket
+After=keyflap-signer.socket keyflap-signer-admin.socket
+
+[Service]
+Type=simple
+User=keyflap-signer
+Group=keyflap-signer
+ExecStart=/opt/keyflap/node/bin/node --disable-warning=ExperimentalWarning /opt/keyflap/app/packages/signer/src/main.ts --service --config /etc/keyflap/signer.json
+Sockets=keyflap-signer.socket keyflap-signer-admin.socket
+# D1 auto-unlock: the key-encryption key and the channel key, sealed with systemd-creds
+# (TPM2 when present, else the host key) and decrypted by PID 1 into a directory only
+# keyflap-signer can read.
+LoadCredentialEncrypted=kek:/etc/keyflap/credentials/kek.cred
+LoadCredentialEncrypted=channel-key:/etc/keyflap/credentials/channel-key.cred
+StateDirectory=keyflap/signer
+StateDirectoryMode=0700
+WorkingDirectory=/var/lib/keyflap/signer
+Environment=HOME=/var/lib/keyflap/signer
+Restart=on-failure
+RestartSec=2
+UMask=0077
+# No core dumps: they would hold whatever secrets were in memory.
+LimitCORE=0
+
+# Sandboxing. The signer needs the network only for a password manager's CLI.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

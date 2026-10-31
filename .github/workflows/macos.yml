@@ -1,0 +1,42 @@
+name: macOS
+
+# Same-user dev mode and the unit + e2e suites on macOS (Apple silicon). A separate
+# workflow so a macOS failure never blocks the Linux CI. Service mode is Linux-only
+# (ISOLATION_PLAN.md S5 is not built), so there is no installer or isolation job here.
+# macOS runner minutes count 10x against a private repository's quota, so this runs after
+# merging to main and on demand (Actions tab, or `gh workflow run macos.yml --ref BRANCH`),
+# not on every pull request.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      # No --with-deps: that installs Linux system packages; macOS needs none.
+      - name: Install Chromium for Playwright
+        run: pnpm --filter @aab/shim exec playwright install chromium
+      - run: pnpm test:unit
+      - run: pnpm test:e2e

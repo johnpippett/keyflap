@@ -1,0 +1,67 @@
+# Keyflap demo: the broker in dev mode, the bundled test relying party and Chromium, in one
+# throwaway container. Test site only; see demo/README.md.
+#
+#   podman build -f demo/Containerfile --ignorefile demo/Containerfile.dockerignore -t keyflap-demo .
+#   docker build -f demo/Containerfile -t keyflap-demo .      (docker reads the .dockerignore itself)
+#
+# Base: the Playwright image for the pinned Playwright 1.64.1 (Chromium revision 1248, see
+# packages/shim/package.json), Ubuntu 24.04. Pinned by the multi-arch index digest
+# (linux/amd64 + linux/arm64). Bump it together with Playwright.
+FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf
+
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0 \
+    NODE_ENV=production
+
+# The base image's Node predates the October 2026 security release (CVE-2026-111497), so
+# install the patched Node the service mode pins (packages/install/linux/runtime-pins.sh),
+# checksum-verified, into /usr/local (ahead of the image's /usr/bin/node on PATH).
+ARG TARGETARCH
+ARG NODE_VERSION=22.23.4
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64) arch=x64 sha=b8492284c76a54baf58d61668dd0e41ee0fc98adabf9503d30f05d08f55b4406 ;; \
+      arm64) arch=arm64 sha=f7a1e486dbc8b286847815b477d4fb5e9fb963ed4489c3e1588853d685f589f9 ;; \
+      *) echo "unsupported TARGETARCH '$TARGETARCH'" >&2; exit 1 ;; \
+    esac; \
+    f="node-v$NODE_VERSION-linux-$arch.tar.gz"; \
+    curl -fsSL --proto '=https' --tlsv1.2 -o "/tmp/$f" "https://nodejs.org/dist/v$NODE_VERSION/$f"; \
+    echo "$sha  /tmp/$f" | sha256sum -c -; \
+    tar -xzf "/tmp/$f" -C /usr/local --strip-components=1 --no-same-owner \
+      --exclude='*/CHANGELOG.md' --exclude='*/README.md' --exclude='*/LICENSE'; \
+    rm "/tmp/$f"; \
+    [ "$(/usr/local/bin/node -v)" = "v$NODE_VERSION" ]
+
+WORKDIR /opt/keyflap
+
+# Dependencies first (cached while only sources change). Runtime deps only.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY packages/ ./packages/
+RUN corepack enable \
+ && corepack prepare "$(node -p 'require("./package.json").packageManager')" --activate \
+ && pnpm install --frozen-lockfile --prod \
+ && pnpm store prune
+
+COPY demo/ ./demo/
+RUN chmod 0755 demo/entrypoint.sh \
+ && ln -s /opt/keyflap/packages/cli/src/main.ts /usr/local/bin/keyflap \
+ && printf '#!/bin/sh\nexec node /opt/keyflap/demo/say.ts "$@"\n' > /usr/local/bin/say \
+ && chmod 0755 /usr/local/bin/say \
+ && chown -R root:root /opt/keyflap
+
+# Test site only: the browser has no way out of the container. Chromium on Linux takes its
+# proxy from these variables (no desktop proxy settings in here), and always goes direct to
+# loopback: localhost and *.localhost, where the test RP is. Everything else is sent to a
+# port nothing listens on, so real sites fail to load (ERR_PROXY_CONNECTION_FAILED).
+ENV http_proxy=http://127.0.0.1:9 \
+    https_proxy=http://127.0.0.1:9 \
+    all_proxy=http://127.0.0.1:9 \
+    no_proxy=localhost,.localhost,127.0.0.1,::1
+
+# Non-root. pwuser comes with the base image (uid 1001). Nothing is kept: no volumes, the
+# data dir lives in the container's home and goes away with it.
+USER pwuser
+WORKDIR /home/pwuser
+EXPOSE 8765
+ENTRYPOINT ["/opt/keyflap/demo/entrypoint.sh"]

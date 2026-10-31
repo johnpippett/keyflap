@@ -1,0 +1,23 @@
+{
+  "name": "@aab/signer",
+  "version": "0.0.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "Key store and signing process. Runs as its own process; reached only over an authenticated unix socket.",
+  "exports": {
+    "./client": "./src/client.ts",
+    "./approval": "./src/approval.ts",
+    "./approver-address": "./src/approver-address.ts",
+    "./tailscale-localapi": "./src/tailscale-localapi.ts",
+    "./protocol": "./src/protocol.ts",
+    "./risk": "./src/risk.ts",
+    "./systemd": "./src/systemd.ts",
+    "./admin-wire": "./src/admin-wire.ts",
+    "./service": "./src/service.ts",
+    "./platform": "./src/platform.ts"
+  },
+  "dependencies": {
+    "@aab/sources": "workspace:*"
+  }
+}

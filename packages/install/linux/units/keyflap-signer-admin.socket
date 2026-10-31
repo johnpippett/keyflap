@@ -1,0 +1,17 @@
+# The signer's admin socket: `sudo keyflap approver list|remove`. root:root 0600, so only root
+# can connect (Node has no SO_PEERCRED; the socket's owner and mode are the check).
+[Unit]
+Description=Keyflap broker signer admin socket (root only)
+
+[Socket]
+ListenStream=/run/keyflap-signer/admin.sock
+FileDescriptorName=signer-admin
+SocketUser=root
+SocketGroup=root
+SocketMode=0600
+DirectoryMode=0750
+RemoveOnStop=yes
+Service=keyflap-signer.service
+
+[Install]
+WantedBy=sockets.target

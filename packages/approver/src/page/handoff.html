@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Human check: live view</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/brand/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#2c303b">
+<link rel="stylesheet" href="/handoff.css">
+<script src="/approval-check.js" defer></script>
+<script src="/handoff-zoom.js" defer></script>
+<script src="/handoff.js" defer></script>
+</head>
+<body>
+<header>
+  <div class="title"><span class="live-tag" aria-hidden="true">LIVE</span><h1>Human check: live view</h1></div>
+  <p class="sub"><strong>You are controlling the site.</strong> This is not an approval screen. Nothing here can approve a sign-in.</p>
+</header>
+<main>
+  <p id="status" role="status">Loading…</p>
+  <section id="context" hidden>
+    <dl>
+      <dt>Site</dt><dd id="host"></dd>
+      <dt>Agent</dt><dd id="agent"></dd>
+      <dt id="said-label">You said</dt><dd id="said"></dd>
+    </dl>
+    <p class="notice">Live view of the website. Nothing in this picture is from the broker, and nothing here can approve a sign-in.</p>
+    <p class="warning">The agent can see this page after you tap Done. Don't type passwords here.</p>
+    <p id="signin-note" class="notice" hidden>You approved this human check and one sign-in: after you tap Done, the agent signs in once without asking again.</p>
+  </section>
+  <section id="start" hidden>
+    <button id="start-button" type="button">Start live view (Face ID)</button>
+  </section>
+  <section id="live" hidden>
+    <div class="frame">
+      <div id="viewport" class="viewport">
+        <div id="stage" class="stage">
+          <img id="screen" alt="Live view of the website">
+          <img id="detail" alt="" hidden>
+        </div>
+      </div>
+      <p id="unavailable" class="unavailable" hidden>Live view unavailable</p>
+    </div>
+    <div class="row zoom">
+      <button type="button" id="zoom-out" aria-label="Zoom out" disabled>−</button>
+      <button type="button" id="zoom-fit" disabled>Fit</button>
+      <button type="button" id="zoom-in" aria-label="Zoom in">+</button>
+    </div>
+    <p class="hint">Pinch or tap + to zoom. Two fingers move the view; one finger taps and drags on the site.</p>
+    <div class="row">
+      <button type="button" class="scroll" data-dy="-400">Scroll up</button>
+      <button type="button" class="scroll" data-dy="400">Scroll down</button>
+    </div>
+    <form id="text-form" class="row">
+      <input id="text" type="text" maxlength="256" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Text to type into the page">
+      <button type="submit">Type</button>
+    </form>
+    <div class="row keys">
+      <button type="button" class="key" data-key="Enter">Enter</button>
+      <button type="button" class="key" data-key="Backspace">⌫</button>
+      <button type="button" class="key" data-key="Tab">Tab</button>
+      <button type="button" class="key" data-key="Escape">Esc</button>
+      <button type="button" class="key" data-key="ArrowLeft">←</button>
+      <button type="button" class="key" data-key="ArrowUp">↑</button>
+      <button type="button" class="key" data-key="ArrowDown">↓</button>
+      <button type="button" class="key" data-key="ArrowRight">→</button>
+    </div>
+    <p id="input-error" class="error" hidden></p>
+  </section>
+  <section id="finish" class="row" hidden>
+    <button id="cancel" type="button" class="cancel">Cancel</button>
+    <button id="done" type="button" class="done">Done</button>
+  </section>
+</main>
+</body>
+</html>

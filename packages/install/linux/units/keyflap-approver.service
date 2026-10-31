@@ -1,0 +1,50 @@
+# Keyflap broker approver front: serves the phone approver page from the root-owned install
+# and forwards /api/* to the core, filtering what comes back (docs/APPROVER_INTEGRITY_PLAN.md).
+# The core never serves the page, so a compromised core can't change what the phone runs.
+# Installed by packages/install/linux/install.sh (docs/integrations/service-mode.md).
+[Unit]
+Description=Keyflap broker approver page (front)
+Documentation=file:///opt/keyflap/app/docs/integrations/service-mode.md
+Requires=keyflap-approver.socket
+After=keyflap-approver.socket
+
+[Service]
+Type=simple
+User=keyflap-web
+Group=keyflap-web
+ExecStart=/opt/keyflap/node/bin/node --disable-warning=ExperimentalWarning /opt/keyflap/app/packages/cli/src/service/approver-main.ts --config /etc/keyflap/approver.json
+Sockets=keyflap-approver.socket
+# (TLS credentials, when configured, come from keyflap-approver.service.d/tls.conf)
+WorkingDirectory=/
+Restart=on-failure
+RestartSec=2
+UMask=0077
+# No core dumps: they would hold whatever secrets were in memory.
+LimitCORE=0
+
+# Sandboxing. It accepts on the listener systemd hands it and connects to the core's API
+# socket; it can't open any network socket of its own, and has no state.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

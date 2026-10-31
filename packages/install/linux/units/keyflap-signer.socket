@@ -1,0 +1,18 @@
+# The core's channel to the signer (invariant 9). Only keyflap-core can connect: the socket is
+# keyflap-signer:keyflap-core 0660 in /run/keyflap-signer (root:keyflap-core 0750, tmpfiles.d/keyflap.conf).
+# Frames on it are still HMAC'd with the channel key (second layer).
+[Unit]
+Description=Keyflap broker signer socket (core channel)
+
+[Socket]
+ListenStream=/run/keyflap-signer/signer.sock
+FileDescriptorName=signer
+SocketUser=keyflap-signer
+SocketGroup=keyflap-core
+SocketMode=0660
+DirectoryMode=0750
+RemoveOnStop=yes
+Service=keyflap-signer.service
+
+[Install]
+WantedBy=sockets.target

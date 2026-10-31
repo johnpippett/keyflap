@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Keyflap">
+<defs>  <clipPath id="kf-t"><rect x="0" y="0" width="64" height="31"/></clipPath>
+  <clipPath id="kf-b"><rect x="0" y="33" width="64" height="31"/></clipPath></defs>
+  <g clip-path="url(#kf-t)"><rect x="6" y="4" width="52" height="56" rx="7" fill="#2A47E0"/></g>
+  <g clip-path="url(#kf-b)"><rect x="6" y="4" width="52" height="56" rx="7" fill="#1F3BD1"/></g>
+  <path fill="#F4F5F7" d="M20 13H28.4V29.4L37.4 13H47L36.6 30.4L47.5 51H38.2L31.2 37.6L28.4 41V51H20Z"/>
+  <rect x="6" y="31" width="52" height="2" fill="#0A0B0F"/>
+  <rect x="3" y="29.5" width="4" height="5" rx="1" fill="#8A90A0"/>
+  <rect x="57" y="29.5" width="4" height="5" rx="1" fill="#8A90A0"/>
+</svg>
