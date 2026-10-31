@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/assets/keyflap-logo-on-dark.svg">
-    <img src=".github/assets/keyflap-logo-on-light.svg" alt="Keyflap" width="360">
+    <img src=".github/assets/keyflap-logo-on-light.svg" alt="Keyflap" width="313">
   </picture>
 </p>
 
