@@ -191,7 +191,9 @@ mode on macOS (S5): the installer".
 
 ### Upgrading
 
-Download and check the new release the same way, then run its
+Re-running the one command upgrades with the answers it saved
+(`/opt/keyflap-release/bootstrap.conf`), and keeps the connected password manager. By hand:
+download and check the new release the same way, then run its
 `install.sh` with the same options as the first time (the configuration is rewritten from
 them). It stops the services, replaces `/opt/keyflap`, keeps the key store, its KEK, the
 channel key, the database (phones, agents, passwords, policies) and saved sessions, and
@@ -256,8 +258,9 @@ approver front loads),
 `--password-source proton-pass` (below), `--password-source 1password`
 ([1password.md](1password.md#service-mode)), `--headless` / `--xvfb PATH` (below; Linux only,
 refused on a Mac), `--no-start` (write everything, start nothing),
-`--ephemeral-browser` (below), `--node-tarball FILE` / `--browsers-dir DIR` for offline
-installs, `--tailscale-bin PATH` (the Tailscale CLI the signer runs to watch the approval
+`--ephemeral-browser` (below), `--node-tarball FILE` / `--node-dir DIR` / `--browsers-dir DIR`
+for offline installs, `--password-source none` (disconnect the password manager; without
+`--password-source` an upgrade keeps the connected one), `--tailscale-bin PATH` (the Tailscale CLI the signer runs to watch the approval
 address; the default for a `.ts.net` origin is the first of `/usr/bin/tailscale`,
 `/usr/sbin/tailscale`, `/usr/local/bin/tailscale` that only root can change; on a Mac with the
 standalone Tailscale app the signer reads Tailscale's setting without a CLI, see below; the
@@ -269,7 +272,8 @@ supported path. Its install options stay for anyone building the app themselves:
 `--apns-key FILE --apns-key-id ID --apns-team-id ID --apns-bundle-id ID [--apns-sandbox]
 [--apns-generic]` (push to the app through APNs; the .p8 key becomes a sealed credential,
 `apns-key`). On a terminal, `sudo keyflap approver pair` also shows the pairing link as a QR
-code, for the app's scanner; the web approver just uses the link.
+code, for the app's scanner. The web approver uses the same QR code: point the iPhone camera
+at it, and pair in Safari first.
 
 Re-running `install.sh` upgrades the code and keeps the key store, its KEK, the channel
 key and the database (see "Upgrading" above). It issues a fresh host token each time
@@ -290,8 +294,10 @@ key and the database (see "Upgrading" above). It issues a fresh host token each 
   ```sh
   sudo keyflap agent add|list|revoke …
   sudo keyflap password add <site> [--username U] [--totp]   # secrets from a no-echo prompt
-  sudo keyflap password import <file.csv> [--expect F] [--site S]... [--all]   # Apple / Google / Chrome CSV export
+  sudo keyflap password import <file.csv> [--expect F] [--site S]... [--all]   # Apple, Chrome, Firefox, 1Password or Bitwarden CSV export
   sudo keyflap password list|remove …
+  sudo keyflap password-source add|remove|trust …   # connect, disconnect or re-pin a password manager
+  sudo keyflap setup|doctor
   sudo keyflap approver pair|list|remove …
   sudo keyflap policy set|list|remove …
   sudo keyflap sessions list|clear|keep|unkeep …
@@ -299,7 +305,9 @@ key and the database (see "Upgrading" above). It issues a fresh host token each 
   sudo keyflap audit verify|tail …
   ```
 
-  As your own user (or any agent) these fail with "root-only: run this with sudo". On Linux, if
+  As your own user (or any agent) these fail with "root-only: run this with sudo". If the audit
+  log can't record an admin request, the request is refused ("refused: the audit log could not
+  record this request"). On Linux, if
   `sudo keyflap` says "command not found", your sudo's `secure_path` lacks `/usr/local/bin`: run
   `sudo /usr/local/bin/keyflap …`.
   `keyflap daemon` and `--data-dir` are dev-mode only.
@@ -311,7 +319,7 @@ key and the database (see "Upgrading" above). It issues a fresh host token each 
   | Section | What it does |
   |---|---|
   | Passwords | list them, add one (no-echo prompts), import another CSV export, remove one |
-  | Password managers | Proton Pass or 1Password: log the signer's Proton Pass session in, or say which install option turns one on; trust an updated `pass-cli` or `op` |
+  | Password managers | connect Proton Pass or 1Password, trust an updated `pass-cli` or `op`, disconnect |
   | Phones | list them, pair one (QR code), remove one |
   | Agents | list them, add one and set up its app (as setup does), revoke one |
   | Sign-in rules | list them, set one, remove one |
@@ -606,6 +614,10 @@ when the installer created it.
 
 `--purge` deletes every passkey the broker holds. Sites where you registered one need
 another sign-in method afterwards.
+
+Uninstall leaves the agent config that setup wrote. Remove the MCP server with
+`claude mcp remove keyflap`, and delete the keyflap hook from the settings of each agent app
+(Claude Code, Codex, Hermes).
 
 ## Limits
 

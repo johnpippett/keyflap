@@ -8,6 +8,10 @@ gets two connections to the broker:
 | MCP over HTTP, `http://127.0.0.1:8765/mcp` | the model (agent) | the **agent token** (`aab_agent_…`) | drive the managed browser through the eight broker tools; ask for a login or a human handoff |
 | intent socket, `~/.keyflap/run/intent.sock` | the `UserPromptSubmit` **hook** (Claude Code itself, not the model) | the **host token** (`~/.keyflap/host-token`) | record what you typed as the live intent for that agent |
 
+These are the dev-mode paths. In service mode the host token is `/var/lib/keyflap/hook/host-token`
+(on a Mac `/Library/Keyflap/hook/host-token`) and the socket `/run/keyflap/intent.sock` (on a Mac
+`/Library/Keyflap/run/core/intent.sock`).
+
 A login prompt appears only if there is a live intent, and the prompt shows that intent
 verbatim. So everything depends on one thing: **the model must not be able to read the
 host token.** If it can, a prompt-injected agent can record its own "intent" and the
@@ -32,8 +36,7 @@ ln -s "$PWD/packages/cli/src/main.ts" ~/.local/bin/keyflap   # any directory on 
 ### 1. Start the daemon
 
 (In service mode there is nothing to start: the broker runs as system services, under systemd
-on Linux and launchd on a Mac. Run `sudo keyflap agent add <name>` for step 2 (on a Mac,
-`sudo keyflap agent add <name>`); its output has the service-mode hook command
+on Linux and launchd on a Mac. Run `sudo keyflap agent add <name>` for step 2; its output has the service-mode hook command
 (`/usr/local/bin/keyflap hook claude-code --agent <id> --service`) and sandbox paths
 (`/var/lib/keyflap/hook`, on a Mac `/Library/Keyflap/hook`). See [service-mode.md](service-mode.md).)
 
@@ -214,10 +217,11 @@ What we know from the docs:
    agent calls `auth_login` / `auth_enroll_passkey`), the broker checks the real origin
    and the live intent. On a password login page, `auth_login` makes the broker fill and
    submit the form itself (username, password, and a following one-time-code step) from
-   a password you stored with `keyflap password add <site> [--username U] [--totp]` (run it
-   while the daemon is stopped). The agent never sees the values: they are scrubbed from
+   a password you stored (`sudo keyflap password add <site>`, or `keyflap setup`: an export,
+   Proton Pass or 1Password). In dev mode, run `keyflap password add` with the daemon stopped. The agent never sees the values: they are scrubbed from
    every tool result, and fields still holding them are cleared after the submit.
-3. The daemon terminal shows the prompt:
+3. With the phone approver (the installed default), the fields below appear as a card on your
+   phone. With the terminal approver, the daemon terminal shows the prompt:
 
    ```
    ┌─ Keyflap: approval requested ────────────────────────────

@@ -138,10 +138,11 @@ source $V/lib.sh && load_run && keyflap status --json --data-dir "$DATA"
 
 Do not drive these without the user's say-so. They cost money, act on the real desktop, or touch real accounts. See `features/needs-approval.md`.
 
-- Phone approver with the user's real phone (`--approver phone`) and the iOS app: need the user's phone, Tailscale, push services. (`drive.sh handoff` uses a simulated phone on loopback inside the sandbox instead.)
-- Proton Pass source (`--password-source proton-pass`): reads the user's real vault.
+- Phone approver with the user's real phone (`--approver phone`) and the iOS app (parked): need the user's phone, Tailscale, push services. (`drive.sh handoff` uses a simulated phone on loopback inside the sandbox instead.)
+- Proton Pass source (`--password-source proton-pass`) and 1Password source (`--password-source 1password`): read the user's real vault.
 - `--headed`: opens a window on the user's desktop.
 - Service mode install, uninstall: need root. `pnpm test:isolation`: podman or docker, systemd container.
+- The Mac installs (service mode and the simple install): need a real Mac, and root for service mode.
 - Any real third-party site.
 
 ## Not covered by this skill
@@ -149,7 +150,7 @@ Do not drive these without the user's say-so. They cost money, act on the real d
 - The repo's own suites (`pnpm test:unit`, `pnpm test:e2e`, `pnpm test:isolation`). Run them as CLAUDE.md says before pushing. This skill did not check whether they stay out of your real home or the repo tree (a test runner may write a cache).
 - The security invariants. The skill checks some behavior (prompt content, fail-closed denial, no secret in logs and audit), but the invariant tests are in `packages/*/test/inv*`.
 - allow-for grants, ask-strong, session TTL, high-risk sites, the denylist beyond `--deny`.
-- macOS, and Node versions other than 26.7.0.
+- macOS. Node lines other than the one the launcher found (it requires ^22.23.4, ^24.22.1 or >= 26.12.1).
 
 ## If the product needs a change to isolate it
 

@@ -4,8 +4,7 @@ name: Release
 # Apple silicon: the bundle is OS-independent, the darwin tarball adds the darwin Node and
 # keyflap-launch cross-compiled in a pinned container, so one Linux job builds all three),
 # attests them (Sigstore, keyless, through GitHub artifact attestations) and opens a *draft*
-# GitHub Release for the owner to review and publish. Tags only: CI minutes are limited, so
-# never on push or PR.
+# GitHub Release for the owner to review and publish. Tags only, never on push or PR.
 # Verify a download: docs/integrations/service-mode.md, "Install from a release".
 on:
   push:
@@ -58,7 +57,7 @@ jobs:
             git status --short; echo "::error::the tree changed during the checks"; exit 1
           fi
           packages/install/linux/build-bundle.sh --release dist --version "${TAG#v}" --os all --arch all
-          # The one-command installer asset (Mac plan M5), once its script exists.
+          # The one-command installer asset (install-keyflap.sh).
           if [[ -x packages/install/bootstrap/make-bootstrap.sh ]]; then
             packages/install/bootstrap/make-bootstrap.sh dist "${TAG#v}"
           fi

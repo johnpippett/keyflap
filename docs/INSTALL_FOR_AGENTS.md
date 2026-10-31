@@ -17,10 +17,12 @@ command, and you never see what they type into it.
   to treat it as exposed and to replace it.
 - Never pair a phone. Never open, fetch, scan or forward a pairing link or its QR code.
 - Never edit Keyflap's policy, its high-risk list or any file under `/opt/keyflap`,
-  `/etc/keyflap`, `/var/lib/keyflap` or `/Library/Keyflap`.
-- Never edit the hook, MCP server or sandbox settings that setup wrote for you
+  `/etc/keyflap`, `/var/lib/keyflap` or `/Library/Keyflap` (after the simple install,
+  `~/.keyflap` and `~/Library/Application Support/Keyflap`).
+- Never edit the hook, MCP server or sandbox settings that setup wrote, or asked the user to merge
   (`.claude/settings*.json`, `.mcp.json`, `~/.claude.json`, `~/.codex/hooks.json`,
-  `~/.hermes/plugins/keyflap-intent/`). If one looks wrong, tell the user and point them at
+  `~/.codex/config.toml`, `~/.hermes/plugins/keyflap-intent/`, `~/.hermes/config.yaml`,
+  `~/.hermes/.env`). If one looks wrong, tell the user and point them at
   `sudo keyflap setup`.
 - Never approve anything on the user's behalf.
 
@@ -53,8 +55,8 @@ the phone.
 
 For 1Password, the user needs a service account token (1Password.com, Developer, Service
 accounts) with read access to a vault for agents, and the `op` command-line tool installed from
-1Password's own installer or package repository, so that it is in `/usr/local/bin` or
-`/usr/bin` and owned by root. For Proton Pass, the user needs a personal access token and
+1Password's own installer or package repository, so that it is in `/usr/local/bin`,
+`/usr/bin` or `/opt/keyflap/tools/op/`, owned by root. For Proton Pass, the user needs a personal access token and
 Proton's `pass-cli` in the same kind of place. Keyflap refuses a tool in a user-owned folder
 such as Homebrew's `/opt/homebrew/bin` or `~/.local/bin`, because anything running as the
 user, including you, could replace it. You may help install the tool; the token stays with
@@ -82,7 +84,7 @@ curl -fsSL https://github.com/johnpippett/keyflap/releases/latest/download/insta
 ```
 
 Tell them to run it in a terminal window of their own (on a Mac, the Terminal app), not
-through you. Then wait until they say it has finished.
+through you, from their own account (the one you run as), not from a root shell. Then wait until they say it has finished.
 
 ### Only if the user says they can't use an admin password
 
@@ -109,17 +111,17 @@ Most answers are already filled in, so the user mostly presses Enter.
 
 1. The admin password, by `sudo`.
 2. The phone approver address, only if Tailscale did not provide one.
-3. Which password manager to use. For 1Password, the service account token, which is not
-   shown on screen. On Linux without Xvfb, whether to go on with a headless browser.
+3. Which password manager to use, then the vault for agents (blank: every vault). For
+   1Password, the service account token, which is not shown on screen. On Linux without Xvfb, whether to go on with a headless browser.
 4. Guided setup (`keyflap setup`), six steps. Each change is shown before it is made.
    1. A preflight check of the services.
    2. The phone approver address. If Tailscale is not serving it yet, setup shows a
       `tailscale serve` command and runs it after the user types `y`.
    3. Pairing the phone. The user scans a QR code with the iPhone camera, opens the link in
       Safari, taps "Pair this phone", then Share, Add to Home Screen.
-   4. The agent. Setup picks the agent host it found (Claude Code, Codex or Hermes), creates
-      your agent identity and shows the config changes before writing them. The user types `y`
-      to write them.
+   4. The agents. Setup sets up Claude Code and every other agent app it finds (Codex,
+      Hermes), one after another. For each it creates your agent identity and shows the config
+      changes before writing them. The user types `y` to write them.
    5. Passwords. Proton Pass: log in with the personal access token, not shown on screen.
       Apple Passwords: export from the Passwords app (File, Export All Passwords), then drag the
       file into the terminal window and choose the sites. Setup then reminds them to delete
@@ -144,8 +146,11 @@ Most answers are already filled in, so the user mostly presses Enter.
    - Claude Code: quit, then start `claude` again in the project setup configured (or anywhere,
      if setup wrote the config for all projects). `/mcp` lists `keyflap` as connected, and
      `/sandbox` says the sandbox is active.
-   - Codex: start it again, run `/hooks` and trust the keyflap hook, then `/mcp`.
-   - Hermes Agent: restart the gateway.
+   - Codex: the user merges the `config.toml` part that setup showed, starts Codex with
+     `KEYFLAP_AGENT_TOKEN` set from the token file, runs `/hooks` to trust the keyflap hook,
+     then `/mcp`.
+   - Hermes Agent: the user adds the agent token to `~/.hermes/.env` and merges the
+     `config.yaml` part (`terminal.backend: docker`), then restarts the gateway.
 
 3. Do a test sign-in. Ask the user which site to use, and ask them to type the request
    themselves, for example "Sign in to github.com". Keyflap only signs in after a message from
@@ -168,6 +173,8 @@ Each row is a line `keyflap doctor` prints. You tell the user what to run; they 
 | `no phone paired: every sign-in would be denied` | Pairing did not finish. | The user runs `sudo keyflap setup` and does the pairing step. |
 | `no agents` | Setup did not create your agent identity. | The user runs `sudo keyflap setup` and does the agent step. |
 | `MCP endpoint on 127.0.0.1:8765: …` | The broker's MCP server does not answer. | The user checks the core service log with the command doctor prints. |
+| `approval address off: it was changed …` | The Tailscale serve setting changed, so Keyflap removed the phone. | Stop. Tell the user. They fix the setting and run the `fix:` line, which pairs the phone again. |
+| `approval address waiting for Tailscale: …` | Tailscale is restarting or stopped. | Wait 30 seconds, or ask the user to start Tailscale. |
 | `… unreachable from this machine` (approver-origin) | The phone approver page does not answer at its address. | If it is a `.ts.net` address, the user runs the `tailscale serve --bg --https=8766 http://127.0.0.1:8766` command doctor prints (Mac: the Tailscale app path in place of `tailscale`). |
 | `…: certificate not valid` | HTTPS certificates are off for the tailnet. | The user turns on HTTPS Certificates in the Tailscale admin console (DNS page). |
 | `no Claude Code MCP server points at this broker (project … or user scope)` | Claude Code has no `keyflap` server for this folder. | You are in another project than the one setup configured. Ask the user to start you there, or to run setup again and pick "All your projects". |

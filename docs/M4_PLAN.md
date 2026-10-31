@@ -1,5 +1,7 @@
 # M4 plan: phone approval
 
+Status: **done**. Invariant tests: IMPLEMENTATION_NOTES "Status".
+
 Scope (section 15): push + phone web page with a user-verification gesture, signed
 approvals checked by the signer. Invariant test: 6.
 

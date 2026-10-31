@@ -80,8 +80,8 @@ in the advisory unless you'd rather not be.
   doesn't defend against by design (it prints a banner saying so; use service mode);
 - a site blocking automated browsers or showing a CAPTCHA (Keyflap never disguises
   automation or solves human checks);
-- bugs in Chromium, Playwright, Proton Pass's `pass-cli` or other upstream projects:
-  report those upstream, and to us only if Keyflap makes them exploitable.
+- bugs in Chromium, Playwright, Proton Pass's `pass-cli`, 1Password's `op`, Tailscale or other
+  upstream projects: report those upstream, and to us only if Keyflap makes them exploitable.
 
 When you research, use your own installation and the bundled test relying party. Don't
 test against other people's accounts, or against websites you don't own.
@@ -115,6 +115,12 @@ These are documented trade-offs, not open vulnerabilities:
   network access, and its key-encryption key is a file that FileVault protects, not a TPM. The
   uid boundary and root-owned code are the same
   ([service-mode.md, "On a Mac"](docs/integrations/service-mode.md#on-a-mac)).
+- **The approval address is watched, not locked.** On a Mac any local user can change where
+  `tailscale serve` points the approval address; on Linux, root or the Tailscale operator can.
+  The signer checks the setting every 2 seconds (every 250 ms while an approval waits). On a
+  change it removes every paired phone and refuses approvals. A change undone between two
+  checks is not caught
+  ([phone-approver.md](docs/integrations/phone-approver.md#the-approval-address-is-watched)).
 - **The audit log has no external anchor.** It detects edits, insertions and deletions,
   but not a truncated tail or a rewrite of every row from some point onward.
 - **Transformed copies of a secret aren't scrubbed.** Output scrubbing catches a filled

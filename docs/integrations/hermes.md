@@ -148,7 +148,7 @@ a container that sees only what is mounted into it. Keep it that way:
 
 - `docker_volumes: []` and `docker_mount_cwd_to_workspace: false`, or at least never mount
   your home directory, the Keyflap data dir (`~/.keyflap`, or `/var/lib/keyflap/hook` in service
-  mode) or `~/.hermes` (the plugin and its config are code Hermes runs on the host).
+  mode, `/Library/Keyflap/hook` on a Mac) or `~/.hermes` (the plugin and its config are code Hermes runs on the host).
 - `docker_forward_env: []` (nothing from your environment).
 - `keyflap doctor` fails the `hermes-backend` check while the backend is `local` (or unset).
 
@@ -177,8 +177,8 @@ does in its own process on the host.
   that way**; use the terminal backend instead.
 
 In service mode the broker itself is isolated from your user; the hook's copy of the host
-token (`/var/lib/keyflap/hook/host-token`) is still yours, so the Docker backend requirement
-is the same ([service-mode.md](service-mode.md)).
+token (`/var/lib/keyflap/hook/host-token`, on a Mac `/Library/Keyflap/hook/host-token`) is
+still yours, so the Docker backend requirement is the same ([service-mode.md](service-mode.md)).
 
 ## Known limits
 

@@ -1,6 +1,6 @@
 # Mac plan: service mode, the simple install and agent-led setup on macOS
 
-Status: **building** (2026-10-29; M1 to M7 landed, M8 open). Owner decision (`DECISIONS.md`, "Mac works like Linux"): Mac
+Status: M0 to M7 done (2026-10-31). M8, the end-to-end run with a real phone on a Mac service install, is not recorded yet. Owner decision (`DECISIONS.md`, "Mac works like Linux"): Mac
 is supported at launch and works like Linux. This plan is ISOLATION_PLAN.md step S5, plus the
 simple Mac install and the agent-led setup from the README roadmap. Section 5 of
 ARCHITECTURE.md is unchanged. Every Mac-only difference from the Linux design is listed under
@@ -137,26 +137,29 @@ read its files and change its code) and name the real install. It is never the d
   honours the fs key provider and that dscl user creation is idempotent. Results recorded in
   IMPLEMENTATION_NOTES. (M2 already proved that `keyflap-launch` hands over a `SockPathOwner`
   socket and a TCP listener, and that macOS enforces socket file modes on `connect()`.)
+  **Done** (IMPLEMENTATION_NOTES "Service mode on macOS (S5): the installer").
 - **M1 Platform layer** (Linux-testable): a `ServicePlatform` lookup in `@aab/signer/platform`
   (linux, darwin, unsupported) replacing `serviceModeUnsupported`; `SERVICE_PATHS` per platform;
   user lookup through `System` (dscl on darwin); a service-manager seam for setup and doctor
   (`systemctl` / `launchctl`, logs hint); headless channel option through the shim; doctor and
-  setup text per platform; darwin pins in the paths test.
+  setup text per platform; darwin pins in the paths test. **Done** (IMPLEMENTATION_NOTES
+  "Service mode on macOS (S5): the platform layer").
 - **M2 keyflap-launch**: the C source, a reproducible build, tests on the Mac. **Done**
   (IMPLEMENTATION_NOTES "keyflap-launch"): cross-built on Linux, so the release job needs no
   macOS runner; the launchd findings M3 needs (default socket mode 0666, socket files left
   after `bootout`, no `GroupName`) are listed there.
 - **M3 Mac installer**: `packages/install/macos/{install.sh,uninstall.sh}` (bash 3.2, BSD tools),
   plist templates, darwin Node pins in `runtime-pins.sh`, `build-bundle.sh --os darwin` producing
-  `keyflap-V-darwin-arm64.tar.xz`, release workflow building it.
+  `keyflap-V-darwin-arm64.tar.xz`, release workflow building it. **Done** (IMPLEMENTATION_NOTES
+  "Service mode on macOS (S5): the installer").
 - **M4 Mac isolation suite**: `packages/isolation` runs on darwin with `sudo -n` against the real
   install: invariants 1, 5, 7 and 9 from a third uid (task_for_pid/lldb/vmmap, `ps eww`, `lsof`,
   socket connects, writes under the prefix), plus upgrade and uninstall. **Done**
   (IMPLEMENTATION_NOTES "Isolation suite on macOS"): no lldb (a stub without the Command Line
   Tools); task_for_pid through JXA, run from Linux with `packages/isolation/darwin/run-on-mac.sh`.
 - **M5 Agent-led setup**: the one-command bootstrap (both OS), setup on `/dev/tty`,
-  `docs/INSTALL_FOR_AGENTS.md`, Tailscale CLI path on macOS; the website's install section in
-  `../keyflap-site` on a branch, not deployed.
+  `docs/INSTALL_FOR_AGENTS.md`, Tailscale CLI path on macOS. **Done** (IMPLEMENTATION_NOTES
+  "Agent-led setup and the one-command install").
 - **M6 Simple Mac install.** **Done** (IMPLEMENTATION_NOTES "Simple Mac install";
   `docs/integrations/simple-mac-install.md`): `install-keyflap.sh --simple`, `install-simple.sh`,
   the LaunchAgent `com.keyflap.simple`, the key file, the label in status, doctor and setup.

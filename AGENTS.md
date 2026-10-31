@@ -7,6 +7,7 @@ security-relevant code, and record any new deviation there. The owner's dated pr
 decisions, with his reasons, are private: `../keyflap-site/notes/DECISIONS.md` (ideas not yet
 decided: `notes/INBOX.md` there). Read it before changing policy, approvals, the high-risk list
 or the CLI; the docs cite it as `DECISIONS.md`. Never add either file to this public repo.
+Outside contributors: open an issue before you change policy, approvals, the high-risk list or the CLI.
 
 ## Non-negotiables
 
@@ -68,7 +69,9 @@ packages/
              view (src/handoff.ts: gating, page.screenshot frames, owner input, handoff_open)
   test-rp/   local relying party (deliberately unbranded: it plays a third-party site): passkey register/login, password + TOTP, human-check modes
   mcp/       MCP Streamable HTTP server (the agent's only interface), the eight tool definitions
-  cli/       `keyflap`: daemon, agent add/list/revoke, Claude Code hook (src/main.ts, bin); service mode
+  cli/       `keyflap`: daemon, setup and doctor (src/setup/, src/doctor.ts), agent add/list/revoke, the
+             Claude Code, Codex and Hermes hooks, CSV import (src/password-import.ts), simple-install
+             detection (src/simple-install.ts) (src/main.ts, bin); service mode
              (src/service/: keyflap-core entry, admin-socket CLI, configs, Xvfb); the full-screen
              console (src/console/: `sudo keyflap`, and as your own user the unprotected console for
              dev mode and the simple install, src/console/dev-*.ts, always marked `! UNPROTECTED`)
@@ -94,6 +97,8 @@ pnpm lint             # biome check (pnpm lint:fix to apply)
 pnpm check:escapes    # lint/type suppressions stay under the ceiling in scripts/check-escapes.mjs
 pnpm check:comments   # no code comments in .ts, .js, .mjs (scripts/check-comments.ts)
 pnpm check:bidi       # no invisible direction or line-separator characters in .ts, .js, .mjs
+pnpm check:static     # typecheck, lint and the three source checks above, in parallel
+pnpm check            # check:static, then pnpm test
 pnpm test             # all vitest projects
 pnpm test:unit        # fast, no browser
 pnpm test:e2e         # Playwright Chromium + spawned signer
@@ -111,10 +116,15 @@ OP_SERVICE_ACCOUNT_TOKEN=… pnpm keyflap daemon --unprotected --password-source
                                 # 1Password logins via a service account (docs/integrations/1password.md)
 pnpm setup:preview [--scenario mac-fresh|linux-fresh|mac-rerun|mac-agents] [--capture DIR]
                                 # the real setup screens against fakes; changes nothing (docs/integrations/setup.md)
+pnpm console:preview [--mode service|dev|simple] [--capture DIR]   # the console screens against fakes
+pnpm keyflap setup --unprotected    # guided dev setup: phone, agents, passwords, then doctor
+pnpm keyflap doctor [--json] [--project DIR]   # read-only health check; exit 1 on a failure
+pnpm keyflap                        # no command, as you: the unprotected console (dev mode, simple install)
 pnpm keyflap agent add <name>       # prints the agent token once + Claude Code config; agent list|revoke <id>
 pnpm keyflap approver list | approver remove <id>      # phone approvers; daemon stopped
 pnpm keyflap password add <site> [--username U] [--totp]   # daemon stopped; secrets via no-echo prompt/stdin
                                 # password list | password remove <id>
+pnpm keyflap password import FILE.csv [--site S]... [--all] [--expect F]   # daemon stopped; a CSV export
 pnpm keyflap policy set <site> (--deny|--ask|--ask-strong|--allow-for 30m) [--agent ID] [--session-ttl 2h|off]
                                 # section 9 rules (docs/M5_PLAN.md); policy list [--json] | policy remove <site>;
                                 # SQLite only, works while the daemon runs (it reads rules per request)
@@ -137,6 +147,8 @@ sudo /opt/keyflap-release/linux/install.sh --bundle /opt/keyflap-release/keyflap
   --approver-origin https://HOST:8766 [--xvfb]
 sudo keyflap approver pair | agent add <name> | password add <site> | policy … | sessions … | status | audit …
                                 # the installed `keyflap` talks to the root-only admin sockets
+sudo keyflap                    # no command: the management console
+sudo keyflap setup | doctor     # guided setup; health check
 sudo keyflap password-source add proton-pass|1password [--vault V]   # connect a password manager now
 sudo keyflap password-source remove           # disconnect it; trust pass-cli|op re-pins an updated tool
 sudo packages/install/linux/uninstall.sh [--purge]

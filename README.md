@@ -82,7 +82,7 @@ ask you.
 | **Passwords and one-time codes** | Keyflap keeps them in the signer. It types them into the page itself, also the 6-digit code. |
 | **Password managers** | Use your logins from [Proton Pass](docs/integrations/proton-pass.md) or [1Password](docs/integrations/1password.md). Keyflap reads a login only after you approve. |
 | **Phone approval** | A web page on your phone. No app store is necessary. You swipe a card to approve or deny, and each approval needs Face ID, a fingerprint or a PIN. |
-| **Rules for each website** | Deny a website, always ask, ask with Face ID each time, or allow for a set time (24 hours at most) after one approval. Banks, email and government websites always need a new approval. |
+| **Rules for each website** | Deny a website, always ask, ask with Face ID each time, or allow for a set time (24 hours at most) after one approval. Banks, payments, shopping, email, sign-in providers, code hosting, password managers and government websites always need a new approval with Face ID, a fingerprint or a PIN. |
 | **Saved sessions** | Keyflap keeps the agent signed in after a restart, and encrypts this data. For high-risk websites, it does this only if you allow it. |
 | **Human checks** | Keyflap does not solve CAPTCHAs. When a website shows one, you solve it in a live view on your phone. |
 | **Audit log** | Keyflap records each request and each decision in a hash-chained log. `keyflap audit verify` finds changes to the log. |
@@ -106,7 +106,11 @@ The agent checks your computer and explains each step. Then it gives you one com
 run that command yourself. The agent cannot do it for you, on purpose: it must never set up
 its own guardrails.
 
-**Or run the command yourself.** It works on a Mac with Apple silicon and on Linux:
+**Or run the command yourself.** It works on a Mac with Apple silicon and on Linux. First set
+up [Tailscale](https://tailscale.com/download) on this computer and on your phone, in the same
+tailnet, with MagicDNS and HTTPS certificates turned on. On a Mac, use the standalone app from
+tailscale.com/download: the App Store app does not work with Keyflap. Then run this from your
+own account, the one your agents run as:
 
 ```sh
 curl -fsSL https://github.com/johnpippett/keyflap/releases/latest/download/install-keyflap.sh | sudo bash
@@ -116,7 +120,8 @@ The command asks for your admin password. It downloads Keyflap and checks the do
 against fingerprints in its own script. Then it installs Keyflap as separate system users, so
 an agent that runs as you cannot read Keyflap's keys, memory or browser. A guided setup
 follows in the same window. You scan a code with your phone, pick your agent and connect your
-password manager. To install step by step instead, read
+password manager. Later, `sudo keyflap` opens the management console, and the same command
+upgrades Keyflap. To install step by step instead, read
 [Getting started](docs/GETTING_STARTED.md).
 
 **No admin password on your Mac?** The
@@ -125,7 +130,7 @@ It protects less: an agent that can run commands as you can read Keyflap's files
 its code.
 
 **See a demo first.** The demo container has Keyflap, a test website and a browser. You
-approve in your terminal. You need podman or docker.
+approve in your terminal. You need podman or docker and a clone of this repository.
 
 ```sh
 demo/run.sh
@@ -152,7 +157,8 @@ Dev mode does not keep the agent away from Keyflap's files. Do not use it for re
 |---|---|
 | Linux | Supported on x86_64 and aarch64. Service mode needs systemd 250 or newer. |
 | macOS | Supported on Apple silicon with macOS 14 or later (tested on macOS 26). Intel Macs are not supported yet. The browser runs without a window on a Mac, so you solve any human check on your phone. |
-| Phone | Any phone browser with passkeys: iOS 16+ Safari or Android Chrome. |
+| Phone | Any phone browser with passkeys: iOS 16+ Safari or Android Chrome. Notifications on an iPhone need iOS 16.4 or later and the page added to the Home Screen. |
+| Network | Tailscale on the computer and the phone, with MagicDNS and HTTPS certificates on. On a Mac, the standalone Tailscale app, not the App Store one. Without Tailscale, you need your own HTTPS address with a real certificate that your phone can reach. |
 
 Keyflap runs on your own computer, for one person. It is not a hosted service.
 
@@ -184,14 +190,13 @@ steps are a plan, not a promise: the order and the timing can change. No step wi
 
 - **An approval address only Keyflap controls.** Today the approval page lives at an address
   that Tailscale serves, and other programs on your computer can change where it points.
-  Keyflap watches that setting: when it changes, Keyflap cancels pending approvals, signs your
-  phone out and warns it, and refuses approvals until you fix it at the computer. Next, the page
-  gets an address that only Keyflap can answer.
-- **A saved-login window that you can change.** Today a saved login lasts 24 hours at most.
+  Keyflap watches that setting: when it changes, Keyflap cancels pending approvals, removes your
+  paired phone and warns it, and refuses approvals until you fix the setting at the computer and
+  pair your phone again. Next, the page gets an address that only Keyflap can answer.
+- **An allow-for limit that you can change.** Today an allow-for rule lasts 24 hours at most.
   You will be able to change that limit.
-- **A high-risk list that you can edit.** You review the list of gated websites during setup.
-  Later you can add websites, remove ones, or reset the list. You do this at your own
-  machine, never through the agent.
+- **A high-risk list that you can edit.** Today the list is built in. You will be able to add
+  websites, remove ones, or reset the list, at your own machine, never through the agent.
 - **Shared saved logins.** Each agent needs its own approval today. You will be able to let
   all your agents use the same saved login, one website at a time.
 

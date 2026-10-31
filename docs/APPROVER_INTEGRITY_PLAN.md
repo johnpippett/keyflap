@@ -1,8 +1,9 @@
 # Approver integrity plan: the web approver shows what it signs, from code the core can't change
 
-Status: **building** (owner decision 2026-10-20). Follows the owner's choice to make the web
-phone approver the supported phone path and park the native iOS app (IMPLEMENTATION_NOTES,
-"Phone approver: the web page is the supported path").
+Status: **done** (2026-10-20). Details: IMPLEMENTATION_NOTES "Approver integrity". Follows
+the owner's choice (2026-10-20) to make the web phone approver the supported phone path and
+park the native iOS app (IMPLEMENTATION_NOTES, "Phone approver: the web page is the supported
+path").
 
 ## Problem
 

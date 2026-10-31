@@ -7,7 +7,7 @@ D6 `--unprotected` gate. S1 done; **S2–S4 and the isolation suite done on Linu
 (macOS) done** on 2026-10-29: launchd, hidden `_keyflap-*` users, and the isolation suite on a
 real Mac (`docs/MAC_PLAN.md`; IMPLEMENTATION_NOTES from "Service mode on macOS (S5): the
 platform layer" on).
-Since 2026-10-20 a third service user, `aab-web`, serves the phone
+Since 2026-10-20 a third service user, `keyflap-web` (`_keyflap-web` on a Mac), serves the phone
 approver page so the core can't change it (`APPROVER_INTEGRITY_PLAN.md`).
 Closes the known limit in IMPLEMENTATION_NOTES "Signer boundary": a process running as
 the user's OS user can defeat invariants 1, 7 and 9.

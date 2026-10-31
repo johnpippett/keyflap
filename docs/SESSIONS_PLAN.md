@@ -1,5 +1,7 @@
 # Sessions plan: persistent browser state, honest challenge outcome, human handoff
 
+Status: P1, P2, P3 and P3b done. P4 dropped 2026-10-20 with the iOS app.
+
 Context: the Hugging Face demo (2026-10-13). The owner typed "Sign in to huggingface.co for
 me", approved on the phone with Face ID, and the broker filled the Proton Pass password. Hugging
 Face then showed an AWS WAF "Let's confirm you are human" page, and `auth_login` reported
@@ -510,7 +512,7 @@ Never text, keys, coordinates or frames.
     `approver/src/page/{handoff.html,handoff.js,handoff.css,app.js,sw.js}`.
   - Wiring: `cli/src/daemon.ts`, `cli/src/service/core-main.ts`.
 - **P4: handoff in the iOS app (dropped 2026-10-20 with the app, IMPLEMENTATION_NOTES Status).** `approver/src/phone.ts` native endpoints,
-  `ios/ReplayApproverCore`, `ios/Sources/ReplayApprover/Views`.
+  `ios/KeyflapApproverCore`, `ios/Sources/KeyflapApprover/Views`.
 - **Each phase:** `pnpm typecheck && pnpm lint && pnpm test && pnpm test:isolation`, the
   verify-aab skill's sandboxed run, plus the hand mutation checks listed below.
 

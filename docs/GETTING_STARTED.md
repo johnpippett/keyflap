@@ -9,15 +9,28 @@ requirements. For an overview, see the [README](../README.md).
 Service mode is the way Keyflap is meant to run. It runs the broker as separate system users,
 so an agent that runs as you cannot read its keys, its memory or its browser. On a Mac with
 Apple silicon or on Linux, one command installs it and runs the guided setup (phone, agent,
-password manager):
+password manager).
+
+Before you run it, set up [Tailscale](https://tailscale.com/download) on this computer and on
+your phone, in the same tailnet, with MagicDNS and HTTPS certificates turned on (Tailscale admin
+console, DNS page). On a Mac, use the standalone app from tailscale.com/download, not the App
+Store app: Keyflap's background service can't read the App Store app's settings. Run the command
+from your own account, the one your agents run as, not from a root shell:
 
 ```sh
 curl -fsSL https://github.com/johnpippett/keyflap/releases/latest/download/install-keyflap.sh | sudo bash
 ```
 
 It checks the download against hashes pinned in its own script before it unpacks anything
-([setup.md](integrations/setup.md#the-one-command)). To have your agent check the machine and
-hand you that command, paste this into your agent:
+([setup.md](integrations/setup.md#the-one-command)). To try the download first without
+installing anything, save the script and run it with `--dry-run`:
+
+```sh
+curl -fsSLO https://github.com/johnpippett/keyflap/releases/latest/download/install-keyflap.sh
+bash install-keyflap.sh --dry-run
+```
+
+To have your agent check the machine and hand you the one command, paste this into your agent:
 
 > Install Keyflap for me. Follow https://github.com/johnpippett/keyflap/blob/main/docs/INSTALL_FOR_AGENTS.md, then give me the one command to run myself.
 
@@ -43,8 +56,10 @@ gh attestation verify keyflap-$V-linux-x64.tar.xz --repo johnpippett/keyflap \
   --signer-workflow johnpippett/keyflap/.github/workflows/release.yml
 sudo tar -xJf keyflap-$V-linux-x64.tar.xz
 sudo ./keyflap-$V-linux-x64/install.sh --approver-origin https://HOST:8766
-sudo keyflap setup     # pairs your phone, writes the Claude Code config, runs keyflap doctor
+sudo keyflap setup     # pairs your phone, sets up each agent app it finds, adds passwords, runs keyflap doctor
 ```
+
+On aarch64, use `linux-arm64` in place of `linux-x64`.
 
 ### By hand on a Mac
 
@@ -70,7 +85,17 @@ sudo keyflap setup
 ### After the install
 
 `sudo keyflap setup` replaces the manual `sudo keyflap approver pair && sudo keyflap agent add`
-([guide](integrations/setup.md)); `sudo keyflap doctor` checks the install any time. The docs also cover the from-source path
+([guide](integrations/setup.md)); `sudo keyflap doctor` checks the install any time.
+`sudo keyflap`, with no command, opens the management console: phones, agents, passwords,
+password managers, rules, saved sessions and health.
+`sudo keyflap password-source add proton-pass|1password [--vault V]` connects a password
+manager later, and `sudo keyflap password-source remove` disconnects it.
+
+To upgrade, run the one command again: it keeps your answers. To remove Keyflap, run the
+`uninstall.sh` command the installer printed at the end
+(`sudo /opt/keyflap-release/keyflap-<version>-<os>-<arch>/uninstall.sh`).
+
+The docs also cover the from-source path
 (`build-bundle.sh` + `install.sh --bundle`, both copied somewhere root-only first). Details,
 options, the differences between Linux and a Mac, and limits:
 [docs/integrations/service-mode.md](integrations/service-mode.md).
@@ -120,9 +145,10 @@ ln -s "$PWD/packages/cli/src/main.ts" ~/.local/bin/keyflap   # or run: pnpm keyf
 ```
 
 **Quickest path: `keyflap setup --unprotected`.** It asks for an approver (phone via Tailscale,
-or this terminal), pairs your phone, creates an agent and writes its Claude Code config
-(after showing you the diff), stores a password, starts the daemon and runs `keyflap doctor`
-([guide](integrations/setup.md)). The manual steps below do the same by hand.
+or this terminal), pairs your phone, creates an agent and writes the config for Claude Code and
+any other agent app it finds (after showing you the diff), offers a password, a password manager
+or an import, starts the daemon and runs `keyflap doctor` ([guide](integrations/setup.md)). The
+manual steps below do the same by hand.
 
 Terminal 1, the test relying party on `http://localhost:3000`:
 
@@ -195,7 +221,8 @@ keyflap --help
   macOS 14 or later (tested on macOS 26). Intel Macs are not supported yet. The install brings
   its own Node and Chromium.
 - For phone approval: a phone browser with passkey support (iOS 16+ Safari, Android
-  Chrome) and an HTTPS origin with a real hostname.
+  Chrome) and an HTTPS origin with a real hostname. Notifications on an iPhone need iOS 16.4
+  or later and the page added to the Home Screen.
 - Dev mode, from a clone: Node.js 22.23.4 or newer on 22.x (24.x: 24.22.1+, 26.x: 26.12.1+;
   older releases have CVE-2026-111497), pnpm 10, and Chromium through Playwright (installed by
   the commands above). TypeScript runs directly through Node's type stripping, no build step.

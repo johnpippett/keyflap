@@ -1,11 +1,10 @@
 name: macOS
 
 # Same-user dev mode and the unit + e2e suites on macOS (Apple silicon). A separate
-# workflow so a macOS failure never blocks the Linux CI. Service mode is Linux-only
-# (ISOLATION_PLAN.md S5 is not built), so there is no installer or isolation job here.
-# macOS runner minutes count 10x against a private repository's quota, so this runs after
-# merging to main and on demand (Actions tab, or `gh workflow run macos.yml --ref BRANCH`),
-# not on every pull request.
+# workflow so a macOS failure never blocks the Linux CI. Service mode on macOS needs root and
+# a real install, so its installer and isolation tests run on a real Mac
+# (packages/isolation/darwin/run-on-mac.sh), not here. This runs after merging to main and on
+# demand (Actions tab, or `gh workflow run macos.yml --ref BRANCH`), not on every pull request.
 
 on:
   push:

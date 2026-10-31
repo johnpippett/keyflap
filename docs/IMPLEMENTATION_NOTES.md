@@ -56,8 +56,12 @@ from or tightens the design. Keep this current.
   9 against a third uid: `packages/isolation/test/inv{1,7,9}-isolation.test.ts`
   (`pnpm test:isolation`, a throwaway systemd container; CI job ready in `isolation/ci-job.yml`), plus
   `signer/test/service-mode.test.ts`, `signer/test/systemd.test.ts`,
-  `cli/test/service-mode.e2e.test.ts`, `cli/test/service-config.test.ts`. macOS (S5) not
-  built.
+  `cli/test/service-mode.e2e.test.ts`, `cli/test/service-config.test.ts`.
+- **Service mode on macOS done** (`MAC_PLAN.md` M0 to M7, 2026-10-29 to 31): launchd, hidden
+  `_keyflap-*` users, `keyflap-launch`, the isolation suite on a real Mac. Also the simple Mac
+  install, the one-command install for both systems, the management console and the
+  approval-address tripwire. Details: "Service mode on macOS (S5): the platform layer" and the
+  sections after it.
 - **Phone approver: the web page is the supported path (owner decision 2026-10-20).** The
   native iOS app (Phase C, below) is **parked**: the broker side stays merged and tested, but
   the app isn't shipped or verified on a device. Reasons: it needs an Apple developer account,
@@ -140,9 +144,9 @@ from or tightens the design. Keep this current.
   hold against an agent that has shell access, the agent must run as a different OS user
   or in a sandbox. A native addon for `SO_PEERCRED` would not fix this on its own (a
   same-uid attacker passes the uid check). Out of scope for M1; flagged for the owner.
-  **Decided and built (Linux):** service mode (`docs/ISOLATION_PLAN.md`, "Service mode"
+  **Decided and built (Linux; macOS since 2026-10-29):** service mode (`docs/ISOLATION_PLAN.md`, "Service mode"
   below): core and signer under their own service users, root-owned install. There the
-  signer socket's owner and mode (set by systemd) admit only `keyflap-core`, and the HMAC
+  signer socket's owner and mode (set by systemd, or by launchd on a Mac) admit only `keyflap-core`, and the HMAC
   channel stays as a second layer with a channel key provisioned at install. Same-user
   `keyflap daemon` requires `--unprotected`, prints a banner and audits `daemon.unprotected`.
 - **API tightened vs. the doc:**
@@ -1148,7 +1152,8 @@ target has never been compiled or run on a device.*
   request can't carry a grant. Approvers deny inconsistent requests unseen
   (`inconsistent_request`). Phase B's known limit applies: the phone renders what the
   broker serves, so a compromised core could show 10 minutes and have the statement say
-  more. The signer's 24 h cap bounds that.
+  more. The signer's 24 h cap bounds that. (Closed 2026-10-20: the page checks the signed
+  statement itself; see "Approver integrity".)
 - **UV inside a window is off.** A grant use sets UV = 0 in authenticatorData (the user
   verified once, not for this login). Sites that require UV reject those logins; use `ask`
   for them. Grants are per exact origin even when the rule is a domain, so each origin
@@ -1742,8 +1747,8 @@ Design and owner decisions D1–D6: `ISOLATION_PLAN.md`. How to install and run 
   agents (invariants 4/5, as accepted). `sudo` can be aliased by a same-user agent (D3
   residual). The installer trusts the checkout it bundles. Chromium runs without its own
   sandbox (Playwright's default), contained by the unit and the uid. A signer restart drops
-  M5 allow-for grants (they live in its memory). Upgrades re-issue the host token. macOS
-  (S5: launchd, `dscl` users, `.pkg`) is not built and can't be run here.
+  M5 allow-for grants (they live in its memory). Upgrades re-issue the host token. (macOS was
+  built on 2026-10-29, without a `.pkg`: see "Service mode on macOS (S5)".)
 
 ## Deviations in the sessions plan (P1, P2, P3)
 
@@ -2505,8 +2510,9 @@ the owner's uid, so any agent with a shell) must not steer anything root runs.
 ## macOS: dev mode and tests (2026-10-22)
 
 Step A of macOS support: same-user dev mode (`keyflap daemon --unprotected`) and `pnpm
-test` (unit + e2e) on macOS, proven by a separate CI workflow. Service mode on macOS
-(ISOLATION_PLAN.md S5: launchd, `dscl` users, `.pkg`) is **not** built. Everything here was
+test` (unit + e2e) on macOS, run by a separate CI workflow. Service mode on macOS
+(ISOLATION_PLAN.md S5) was not built yet when this was written; it was on 2026-10-29, see
+"Service mode on macOS (S5)". Everything here was
 written on Linux. It was first run on a real Mac on 2026-10-29: see "Run on a real Mac" below.
 
 - **Unix socket path length: refused, never truncated (all platforms).** `sun_path` holds
@@ -2590,17 +2596,19 @@ written on Linux. It was first run on a real Mac on 2026-10-29: see "Run on a re
   `script` (see Test helpers), and `setup.e2e` passes on that Mac with the stub python3. Dev mode
   with Claude Code as the agent: a password and one-time-code sign-in with a real phone approval
   succeeded; passkey enrollment and passkey sign-in succeeded; denying on the phone was
-  refused as it should be. Service mode is still not built.
+  refused as it should be. Service mode was not built yet (it was later the same day: see
+  "Service mode on macOS (S5)" below).
 - **CI.** `.github/workflows/macos.yml`: `macos-15` (Apple silicon), Node 22.23.4, pnpm from
   `packageManager`, `playwright install chromium` (no `--with-deps`, which is for Linux
   packages), then typecheck, lint, `test:unit`, `test:e2e`. Separate from `ci.yml` so a
-  macOS failure doesn't block Linux; push to main, pull requests and manual runs, with
-  in-progress runs cancelled per ref. macOS minutes count 10x on a private repository.
+  macOS failure doesn't block Linux; push to main and manual runs, not pull requests, with
+  in-progress runs cancelled per ref.
 
 ## Service mode on macOS (S5): the platform layer (2026-10-29)
 
 Unit M1 of `docs/MAC_PLAN.md`, built and tested on Linux. It is the TypeScript ground the Mac
-installer (M3) stands on; nothing here has run on a Mac yet, and the M0 spike is still owed.
+installer (M3) stands on. When this was written nothing had run on a Mac yet; the M0 spike and
+the M3 install ran on the test Mac later (see the sections below).
 The Linux service-mode tests are unchanged except where this section says so.
 
 - **The gate is a platform lookup.** `servicePlatform()` and `servicePlatformProblem()` in
@@ -2609,7 +2617,7 @@ The Linux service-mode tests are unchanged except where this section says so.
   or macOS with launchd; it is not built for <platform>". The same four places check it (the
   signer's `--service`, the core and approver unit entries, the CLI under `KEYFLAP_MODE=service`),
   so darwin now passes. `signer/test/service-mode.test.ts` and `cli/test/service-mode.e2e.test.ts`
-  run wherever the lookup says yes (so on the macOS workflow too, which has not run yet) and the
+  run wherever the lookup says yes (so on the macOS workflow too) and the
   refusal test runs everywhere else. The "refuses off Linux" wording above and in
   ISOLATION_PLAN.md S5 is superseded.
 - **`SERVICE_PATHS` is a table per platform** (`cli/src/service/paths.ts`): `LINUX_SERVICE_PATHS`
@@ -2846,8 +2854,8 @@ so every entry point keeps its `listenFds` path (`signer/src/systemd.ts`) unchan
   without `UserName` and a process with gid or egid 0 are refused. Mutation-checked: a build
   without the gid checks fails the group-0 test. The same 8 pass with the binary Apple's
   clang 21 builds from the same source (Command Line Tools 26.6, now installed on the test Mac).
-  Not yet run as a real `_keyflap-*` service user: those come with the M3 installer, and the
-  plist's `UserName` is the same mechanism as for `nobody`.
+  Not yet run as a real `_keyflap-*` service user here: those came with the M3 installer, and
+  the plist's `UserName` is the same mechanism as for `nobody`.
 - **launchd behaviour M3 must design for** (measured on the Mac):
   - A socket with no `SockPathMode` is 0666. Every plist socket sets one.
   - `SockPathGroup 0` is ignored when `SockPathOwner` is also 0: the socket is `root:daemon`.
@@ -3323,8 +3331,8 @@ default (DECISIONS.md "Security beats convenience"). User guide:
   (fake `dscl`). `install/test/simple-install-shell.test.ts`: `install-simple.sh` refusals before
   it writes anything, and `uninstall-simple.sh` with and without `--purge`. Both new scripts are
   in the bash-3.2 and BSD lint.
-- **Measured on the test Mac** (macOS 26, Apple silicon, FileVault on, account `keyflap`
-  uid 502, no sudo; the M4 full install was running, so MCP 18765 and approver 18766). The
+- **Measured on the test Mac** (macOS 26, Apple silicon, FileVault on, a non-admin
+  account, no sudo; the M4 full install was running, so MCP 18765 and approver 18766). The
   bootstrap with a loopback release: the notice, default no ("Nothing was installed."), `y`, the
   download checked, and `install-simple.sh` refusing the account's existing passphrase store with
   the `mv` hint; after the move, installed (Chromium headless shell downloaded), then setup to the

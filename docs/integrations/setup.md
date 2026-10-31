@@ -1,8 +1,20 @@
 # Guided setup: `keyflap setup` and `keyflap doctor`
 
 `keyflap setup` walks you from nothing to a working agent: a phone approver origin, a paired
-phone, an agent with its Claude Code config written for you, a password or Proton Pass, and
-a final health check. `keyflap doctor` is that health check on its own, any time.
+phone, an agent for each agent app on the machine (Claude Code, Codex, Hermes), your passwords
+(one site, an Apple Passwords or other CSV export, Proton Pass or 1Password), and a final
+health check. `keyflap doctor` is that health check on its own, any time.
+
+## First run on a Mac with an iPhone
+
+1. On the Mac, install the standalone Tailscale app from tailscale.com/download, not the App
+   Store app, and sign in. On the iPhone, install Tailscale and sign in to the same tailnet.
+2. In the Tailscale admin console, on the DNS page, turn on MagicDNS and HTTPS certificates.
+3. In Terminal, from your own account, run [the one command](#the-one-command). It asks for
+   your admin password, then starts setup.
+4. At the pairing step, scan the QR code with the iPhone camera, open the link in Safari and
+   tap **Pair this phone**. Then tap Share, **Add to Home Screen**.
+5. Restart your agent app, then ask it to sign you in to a site.
 
 ## The one command
 
@@ -23,7 +35,8 @@ can't), asks which password manager to use, runs that release's `install.sh`, th
 `keyflap setup` on the terminal. On a terminal it asks its questions first, then shows one
 progress bar from the download to the started services, and ends with a short summary; the
 detail goes to the install log (macOS `/Library/Keyflap/log/install.log`, Linux
-`/var/log/keyflap/install.log`, root-only). Piped or run by an agent, it prints plain lines. It reads every answer from `/dev/tty`, because its stdin is
+`/var/log/keyflap/install.log`, root-only). It needs a terminal for its questions, and stops
+without one. When its output isn't a terminal, it prints plain lines. It reads every answer from `/dev/tty`, because its stdin is
 the download. Re-running it upgrades with the same answers. It refuses to upgrade an install
 it did not make, because it would rewrite that install's options. `bash install-keyflap.sh
 --dry-run`, as any user, downloads, checks and unpacks into a temporary directory and prints
@@ -35,6 +48,7 @@ and the one-command install".
 ```sh
 sudo keyflap setup                 # service mode (after install.sh): the real install
 keyflap setup --unprotected        # dev mode: same-user broker from a checkout
+"$HOME/Library/Application Support/Keyflap/bin/keyflap" setup   # the simple Mac install
 keyflap doctor [--json] [--project DIR]
 ```
 
@@ -77,19 +91,20 @@ admin socket, a vault, Tailscale or a Claude config.
    running. In service mode it checks that `keyflap-signer`, `keyflap-core` and
    `keyflap-approver` are active and whose Claude Code it configures: the install user (the
    owner of `/var/lib/keyflap/hook`), whoever ran `sudo`.
-2. **Phone approver origin.** Dev mode: phone (recommended) or the terminal approver. For
+2. **Approval address.** Dev mode: phone (recommended) or the terminal approver. For
    the phone it runs `tailscale status --json`; if the node is logged in with MagicDNS and
    HTTPS certificates, it shows
-   `tailscale serve --bg --https=8766 http://127.0.0.1:8766` and runs it only if you answer
-   `y` (default no), then uses `https://<machine>.<tailnet>.ts.net:8766`. Otherwise you type
+   `tailscale serve --bg --https=8766 http://127.0.0.1:8766` and runs it when you confirm
+   (default yes), then uses `https://<machine>.<tailnet>.ts.net:8766`. Otherwise you type
    an origin, and optionally a certificate and key for the approver to serve itself (it
    then listens on `0.0.0.0:<port>`; without one, on loopback behind your proxy). Service
    mode: the origin was fixed by `install.sh`; setup shows it and checks that it answers
    over HTTPS with a valid certificate, and if a `.ts.net` origin doesn't, offers the same
    `tailscale serve` command. On a Mac the Tailscale CLI is the app's
    (`/Applications/Tailscale.app/Contents/MacOS/Tailscale`) when `tailscale` is not on `PATH`.
-   As root, setup runs only a root-owned Tailscale CLI in a root-only directory (`/usr/bin`,
-   `/usr/sbin`, `/usr/local/bin` or the app), never one found on your `PATH`. From then on
+   As root, setup runs a Tailscale CLI as root only if nobody but root can change it
+   (`/usr/bin`, `/usr/sbin`, `/usr/local/bin`). Otherwise, for example the Mac app in
+   `/Applications`, it runs the CLI as you. It never uses one found on your `PATH`. From then on
    Keyflap's signer watches that `tailscale serve` setting and refuses approvals while it
    points anywhere else ([phone-approver.md](phone-approver.md#the-approval-address-is-watched)).
 3. **Pair your phone.** Shows the one-time link and its QR code and waits (up to 10 minutes)
@@ -132,12 +147,15 @@ admin socket, a vault, Tailscale or a Claude config.
    lists every host that was set up.
 5. **Credentials.** A password (and TOTP) for one site, entered without echo (dev mode:
    daemon stopped); an export file (Apple Passwords, Chrome, Firefox, 1Password, Bitwarden
-   CSV): setup reads it as you (the same symlink rules as below), shows each site, username
+   CSV; on a Mac, in the Passwords app choose File > Export All Passwords, then drag the file
+   into the window): setup reads it as you (the same symlink rules as below), shows each site, username
    and whether it has a TOTP, never a password, asks which sites your agents need (blank: all)
    and stores them only after `y`, then reminds you to delete the file; or Proton Pass: setup checks `pass-cli vault list`, offers to log it in
    with a personal access token that it reads without echo and passes in
    `PROTON_PASS_PERSONAL_ACCESS_TOKEN` (never on a command line; see
-   [proton-pass.md](proton-pass.md)), and asks which vault. In service mode, setup and the
+   [proton-pass.md](proton-pass.md)), and asks which vault; or 1Password (dev mode: it checks
+   a service account token and never saves it; the simple install refuses 1Password, see
+   [1password.md](1password.md)). In service mode, setup and the
    console connect Proton Pass or 1Password on the spot (the same routine as `sudo keyflap
    password-source add`): it finds the root-only tool and pins it, checks the credential as
    the signer, asks which vault, and restarts the services. Every change defaults to no, and
@@ -145,7 +163,9 @@ admin socket, a vault, Tailscale or a Claude config.
    install configured, else the import when nothing is stored yet.
 6. **Finish.** Dev mode: asks about `--headed`, prints the `keyflap daemon` command for your
    choices, and offers to start it right there (it keeps running in that terminal). Then
-   `keyflap doctor`, and the test-RP walkthrough from the README.
+   `keyflap doctor`, and the test-RP walkthrough from the README. Simple install: starts
+   Keyflap in the background and checks it. Service mode: runs the checks and shows how to try
+   it.
 
 ## What gets written for Claude Code
 
@@ -196,7 +216,11 @@ fix for each problem:
 | data-dir, sockets | data dir 0700; intent socket and host token yours, 0600 | intent socket (install user, 0600), admin sockets (root, 0600) |
 | daemon, signer, mcp | intent socket answers (else the exact `keyflap daemon` command); signer socket; MCP answers 401 without a token | signer admin socket; MCP |
 | approver-origin, phone | the origin answers over HTTPS with a valid certificate; a phone is paired | same (origin from `/etc/keyflap/approver.json`) |
-| agents, claude-mcp, claude-hook, claude-deny | an agent; an MCP entry pointing at this broker; the hook for an active agent (not via a package manager); the deny rules, loudly if the data dir isn't denied | same, for `/var/lib/keyflap/hook` |
+| root | | a warning without `sudo`: the admin-socket checks are skipped |
+| approver-address | | the watched approval address: ok, waiting for Tailscale, paused, off (it was changed, so phones were signed out), or not watched (not a `.ts.net` origin) |
+| core-signer | | the core reaches the signer |
+| protection, background | simple install: a warning that it protects less; the LaunchAgent `com.keyflap.simple` is loaded | |
+| agents, claude-mcp, claude-hook, claude-deny, claude-files | an agent; an MCP entry pointing at this broker; the hook for an active agent (not via a package manager); the deny rules, loudly if the data dir isn't denied; a settings file it could not parse as JSON (warning) | same, for `/var/lib/keyflap/hook` |
 | hermes-plugin, hermes-backend, hermes-enabled | only if the keyflap-intent plugin is installed: its config names an active agent and owners; `terminal.backend` is a container backend (fails on `local`); `plugins.enabled` lists it | same |
 | codex-hook, codex-deny | only if `~/.codex/hooks.json` has the keyflap hook: it names an active agent; `config.toml` has a permission profile denying the data dir | same, for `/var/lib/keyflap/hook` |
 | chromium, headed | Chromium launches; a warning when headless (bot walls) | keyflap-core runs it; `--xvfb` or not (on a Mac headless is the design, not a warning) |

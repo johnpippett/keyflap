@@ -27,7 +27,13 @@ approved this way. The terminal approver denies them.
   needs a secure origin with a real hostname; a LAN IP or a self-signed certificate won't
   work. The broker does not run or use any relay of its own.
 
-The simplest private option is [Tailscale](https://tailscale.com) on both devices:
+The simplest private option is [Tailscale](https://tailscale.com) on both devices, with
+MagicDNS and HTTPS certificates turned on. On a Mac use the standalone Tailscale app from
+tailscale.com/download: the full install can't watch the App Store app's setting and refuses
+it.
+
+With the one-command install, `sudo keyflap setup` does all of this: it runs `tailscale serve`
+and pairs your phone. The commands below are for dev mode.
 
 ```sh
 # On the broker machine (tailnet name e.g. tail1234.ts.net, machine "broker"):
@@ -71,8 +77,9 @@ keyflap approver pair --approver-origin https://broker.tail1234.ts.net:8766   # 
 ```
 
 `approver pair` reads the setting again first. While it is still wrong, it prints the setting it
-saw and the fix instead of a pairing link. `keyflap status` shows the address on its
-`Address:` line and `keyflap doctor` as the check `approver-address`. After a change they say
+saw and the fix instead of a pairing link. `sudo keyflap status` shows the address on its
+`Address:` line and `sudo keyflap doctor` as the check `approver-address`. In dev mode the
+daemon prints a change in its terminal. After a change they say
 when it was changed and what was there, that phones were signed out to be safe, and either
 "It is right again now" (then only pairing is left) or what is there now.
 
@@ -142,7 +149,8 @@ Keyflap update that changes the icon, delete the home-screen app and add it agai
 Safari (the pairing stays: it lives in Safari). The page versions its icon links by content
 (`?v=<hash>`), so Safari itself always fetches a changed icon.
 
-To add another phone, start the daemon with `--pair`. The new phone registers and shows a
+To add another phone, start the daemon with `--pair` (service mode:
+`sudo keyflap approver pair`). The new phone registers and shows a
 check code; an **already-paired phone must approve adding it**, and its request card shows
 the same code. Approve only if the codes match. The signer refuses the new key without
 that approval.
@@ -159,7 +167,9 @@ agent's name, and the credential type. Requests are cards you can swipe: drag th
 (or tap the blue check under it) to approve, which runs the passkey prompt on the phone; drag it
 left (or tap the cross) to deny. A swipe right never approves by itself: the page checks the
 request and your phone asks for Face ID, a fingerprint or the device PIN, and the card leaves
-only after that succeeds. If you cancel, the card stays and says "Not approved". When several
+only after that succeeds. If you cancel, the card stays and says "Not approved". With an
+`allow-for` rule (24 hours at most), the card says that approving also lets this agent sign in
+there again without asking, for that long. When several
 requests wait, up to two more show behind the first. Unanswered requests deny after two minutes
 (the broker's own timeout is shorter).
 
