@@ -1,1 +1,1 @@
-if (process.platform === 'darwin') process.env.TMPDIR = '/tmp';
+if (process.platform === 'darwin') process.env.TMPDIR = '/private/tmp';

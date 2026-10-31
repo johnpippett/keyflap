@@ -1,7 +1,7 @@
 import { encodeQr } from '@aab/approver';
 import { describe, expect, it } from 'vitest';
 import type { DoctorReport } from '../src/doctor.ts';
-import { DARWIN_SERVICE_PATHS, SERVICE_PATHS } from '../src/service/paths.ts';
+import { DARWIN_SERVICE_PATHS, LINUX_SERVICE_PATHS } from '../src/service/paths.ts';
 import { daemonCommand, emptyState, loadState, type SetupState } from '../src/setup/state.ts';
 import {
   agentStep,
@@ -140,7 +140,7 @@ describe('setup step 2: approver origin', () => {
     sys.file('/usr/bin/tailscale', '', 0o755, 0);
     sys.dir('/etc/keyflap', 0o755, 0);
     sys.file(
-      SERVICE_PATHS.approverConfig,
+      LINUX_SERVICE_PATHS.approverConfig,
       JSON.stringify({ origin: 'https://broker.tail1234.ts.net:8766' }),
     );
     sys.bins.set('tailscale', '/usr/bin/tailscale');
@@ -152,7 +152,7 @@ describe('setup step 2: approver origin', () => {
     const b = new FakeBackend(sys);
     b.kind = 'service';
     const p = new ScriptedPrompter([{ q: /^Run it\? \[Y\/n\]$/, a: '' }]);
-    const c = ctx(sys, b, p, { paths: SERVICE_PATHS });
+    const c = ctx(sys, b, p, { paths: LINUX_SERVICE_PATHS });
     await approverStep(c);
     expect(sys.execs.filter((e) => e.args[1] === '--bg')).toHaveLength(1);
     expect(c.output()).not.toContain('Your phone can now reach');
@@ -250,14 +250,14 @@ describe('setup step 2: approver origin', () => {
     const sys = new FakeSystem();
     sys.dir('/etc/keyflap', 0o755);
     sys.file(
-      SERVICE_PATHS.approverConfig,
+      LINUX_SERVICE_PATHS.approverConfig,
       JSON.stringify({ origin: 'https://b.tail1.ts.net:8766' }),
     );
     sys.http_ = (url) =>
       url === 'https://b.tail1.ts.net:8766/' ? { status: 200 } : { status: null };
     const b = new FakeBackend(sys);
     b.kind = 'service';
-    const c = ctx(sys, b, new ScriptedPrompter([]), { paths: SERVICE_PATHS });
+    const c = ctx(sys, b, new ScriptedPrompter([]), { paths: LINUX_SERVICE_PATHS });
     await approverStep(c);
     expect(c.output()).toContain('set at install time): https://b.tail1.ts.net:8766');
     expect(c.output()).toContain('valid certificate');
@@ -307,14 +307,14 @@ describe('setup step 3: pairing', () => {
     const sys = new FakeSystem();
     sys.dir('/etc/keyflap', 0o755);
     sys.file(
-      SERVICE_PATHS.approverConfig,
+      LINUX_SERVICE_PATHS.approverConfig,
       JSON.stringify({ origin: 'https://b.tail1.ts.net:8766' }),
     );
     const b = new FakeBackend(sys);
     b.kind = 'service';
     b.pairResult = 'timeout';
     const c = ctx(sys, b, new ScriptedPrompter([{ q: /^Pair a phone now\?/, a: 'y' }]), {
-      paths: SERVICE_PATHS,
+      paths: LINUX_SERVICE_PATHS,
     });
     c.state = phoneState();
     expect(await pairStep(c)).toBe('skipped');
@@ -859,7 +859,7 @@ describe('setup steps 1 and 6', () => {
     });
     const b = new FakeBackend(sys);
     b.kind = 'service';
-    const c = ctx(sys, b, new ScriptedPrompter([]), { paths: SERVICE_PATHS });
+    const c = ctx(sys, b, new ScriptedPrompter([]), { paths: LINUX_SERVICE_PATHS });
     await expect(preflight(c)).rejects.toThrow(/keyflap-core not active/);
   });
 
@@ -959,13 +959,13 @@ describe('service backend (sudo keyflap setup)', () => {
         'approver.pair': { url: 'https://b.ts.net:8766/pair#X', origin: 'https://b.ts.net:8766' },
         'approver.address.clear': { state: addressState },
         status:
-          socket === SERVICE_PATHS.signerAdminSocket
+          socket === LINUX_SERVICE_PATHS.signerAdminSocket
             ? { approvers: approvers++ }
             : { mcpUrl: 'http://127.0.0.1:9100/mcp' },
       };
       return r[op] as T;
     };
-    const b = await serviceBackend({ sys, paths: SERVICE_PATHS, admin });
+    const b = await serviceBackend({ sys, paths: LINUX_SERVICE_PATHS, admin });
     expect(b.user).toMatchObject({ uid: 1000, name: 'u', home: '/home/u' });
     expect(await b.mcpPort()).toBe(9100);
     const a = await b.createAgent('claude-code');
@@ -991,9 +991,11 @@ describe('service backend (sudo keyflap setup)', () => {
     });
     expect(r).toBe('paired');
     expect(shown).toBe('https://b.ts.net:8766/pair#X');
-    const cleared = calls.indexOf(`${SERVICE_PATHS.signerAdminSocket} approver.address.clear`);
+    const cleared = calls.indexOf(
+      `${LINUX_SERVICE_PATHS.signerAdminSocket} approver.address.clear`,
+    );
     expect(cleared).toBeGreaterThanOrEqual(0);
-    expect(cleared).toBeLessThan(calls.indexOf(`${SERVICE_PATHS.adminSocket} approver.pair`));
+    expect(cleared).toBeLessThan(calls.indexOf(`${LINUX_SERVICE_PATHS.adminSocket} approver.pair`));
 
     addressState = {
       kind: 'latched',
@@ -1021,7 +1023,7 @@ describe('service backend (sudo keyflap setup)', () => {
     ).rejects.toThrow(
       /the approval address is off: it was changed at 2026-10-30T00:00:00\.000Z \(b\.ts\.net:8766 is on Funnel\), so phones were signed out to be safe\.\n {2}Approvals are off until it is fixed at this computer\.\n {2}fix: sudo tailscale serve reset \(it clears every serve setting on this computer\), then sudo tailscale serve --bg --https=8766 http:\/\/127\.0\.0\.1:8766, then sudo keyflap approver pair/,
     );
-    expect(calls.slice(before)).not.toContain(`${SERVICE_PATHS.adminSocket} approver.pair`);
+    expect(calls.slice(before)).not.toContain(`${LINUX_SERVICE_PATHS.adminSocket} approver.pair`);
   });
 });
 
@@ -1226,7 +1228,7 @@ describe('agent-led setup: setup pre-selects what it detects', () => {
     sys.file('/usr/bin/tailscale', '', 0o755, 0);
     sys.dir('/etc/keyflap', 0o755, 0);
     sys.file(
-      SERVICE_PATHS.approverConfig,
+      LINUX_SERVICE_PATHS.approverConfig,
       JSON.stringify({ origin: 'https://b.tail1.ts.net:8766' }),
     );
     sys.exec_ = (_cmd, args) =>
@@ -1244,7 +1246,7 @@ describe('agent-led setup: setup pre-selects what it detects', () => {
     const b = new FakeBackend(sys);
     b.kind = 'service';
     const p = new ScriptedPrompter([{ q: /^Run it\? \[Y\/n\]$/, a: 'n' }]);
-    const c = ctx(sys, b, p, { paths: SERVICE_PATHS });
+    const c = ctx(sys, b, p, { paths: LINUX_SERVICE_PATHS });
     await approverStep(c);
     expect(sys.execs.map((e) => e.cmd)).toEqual(['/usr/bin/tailscale', '/usr/bin/tailscale']);
     expect(c.output()).toContain(
@@ -1304,11 +1306,11 @@ describe('agent-led setup: importing an Apple Passwords export', () => {
     sys.dir('/home/u/Downloads', 0o700, 1000);
     sys.file('/home/u/Downloads/Passwords 2.csv', CSV, 0o600, 1000);
     sys.dir('/etc/keyflap', 0o755, 0);
-    sys.file(SERVICE_PATHS.coreConfig, JSON.stringify({ passwordSource: null }), 0o644, 0);
+    sys.file(LINUX_SERVICE_PATHS.coreConfig, JSON.stringify({ passwordSource: null }), 0o644, 0);
     const b = new FakeBackend(sys);
     b.kind = 'service';
     const p = new ScriptedPrompter(answers);
-    return { sys, b, p, c: ctx(sys, b, p, { paths: SERVICE_PATHS }) };
+    return { sys, b, p, c: ctx(sys, b, p, { paths: LINUX_SERVICE_PATHS }) };
   }
 
   it('is the default in service mode with no password source, reads the file as the user, stores what you pick', async () => {
@@ -1354,12 +1356,15 @@ describe('agent-led setup: importing an Apple Passwords export', () => {
   it('a configured password source is the default instead', async () => {
     const sys = new FakeSystem();
     sys.dir('/etc/keyflap', 0o755, 0);
-    sys.file(SERVICE_PATHS.coreConfig, JSON.stringify({ passwordSource: { kind: '1password' } }));
+    sys.file(
+      LINUX_SERVICE_PATHS.coreConfig,
+      JSON.stringify({ passwordSource: { kind: '1password' } }),
+    );
     const b = new FakeBackend(sys);
     b.kind = 'service';
-    const c = ctx(sys, b, new ScriptedPrompter([]), { paths: SERVICE_PATHS });
+    const c = ctx(sys, b, new ScriptedPrompter([]), { paths: LINUX_SERVICE_PATHS });
     expect(firstCredentialChoice(c, 0)).toBe('1password');
-    sys.file(SERVICE_PATHS.coreConfig, JSON.stringify({ passwordSource: null }));
+    sys.file(LINUX_SERVICE_PATHS.coreConfig, JSON.stringify({ passwordSource: null }));
     expect(firstCredentialChoice(c, 0)).toBe('import');
     expect(firstCredentialChoice(c, 3)).toBe('skip');
     b.kind = 'dev';

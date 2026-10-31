@@ -10,7 +10,7 @@ import {
   type ServiceDoctorContext,
 } from '../src/doctor.ts';
 import { readAgentToken } from '../src/mcp-headers.ts';
-import { SERVICE_PATHS, servicePaths } from '../src/service/paths.ts';
+import { servicePaths } from '../src/service/paths.ts';
 import { mcpEntry, mergeMcp, mergeSettings, stringify } from '../src/setup/claude-config.ts';
 import { emptyState, type SetupState } from '../src/setup/state.ts';
 import { runCli, tmpDir } from './helpers.ts';
@@ -279,7 +279,7 @@ describe('keyflap doctor (service mode)', () => {
 
   it('a socket with the wrong owner or mode fails', async () => {
     const { sys, ctx } = healthyService();
-    sys.socket(SERVICE_PATHS.intentSocket, { uid: 1000, mode: 0o666 });
+    sys.socket(ctx.paths.intentSocket, { uid: 1000, mode: 0o666 });
     const r = await runChecks(ctx);
     expect(status(r, 'sockets')).toBe('fail');
   });

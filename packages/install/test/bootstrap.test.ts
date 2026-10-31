@@ -125,6 +125,13 @@ function writeFakes(dir: string) {
     'tailscale',
     '[ "$1 $2 $3" = "status --json --peers=false" ] || exit 2\ncat "$FAKE_TAILSCALE_JSON"',
   );
+  const hostXz = spawnSync('sh', ['-c', 'command -v xz'], { encoding: 'utf8' }).stdout.trim();
+  script(
+    'xz',
+    hostXz
+      ? `exec ${q(hostXz)} "$@"`
+      : 'echo "fake xz: this host has no xz, so tar must unpack .xz itself" >&2\nexit 1',
+  );
   writeFileSync(join(dir, 'tailscale.json'), TAILSCALE_OK);
 }
 

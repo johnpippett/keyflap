@@ -5,22 +5,31 @@ import { describe, expect, it } from 'vitest';
 import {
   buildServiceConfigs,
   ConfigError,
+  type InstallOptions,
   onePasswordServiceEnv,
   parseApproverFrontConfig,
   parseCoreConfig,
   protonPassServiceEnv,
 } from '../src/service/config.ts';
 import { installConfig } from '../src/service/install-config.ts';
-import { DARWIN_SERVICE_PATHS, isServiceMode, SERVICE_PATHS } from '../src/service/paths.ts';
+import {
+  DARWIN_SERVICE_PATHS,
+  isServiceMode,
+  LINUX_SERVICE_PATHS,
+  SERVICE_PATHS,
+  servicePaths,
+} from '../src/service/paths.ts';
 import { xauthorityEntry } from '../src/service/xvfb.ts';
 import { MACOS_APP_CLI } from '../src/setup/tailscale.ts';
 import { tmpDir } from './helpers.ts';
 
 const base = { approverOrigin: 'https://box.tail1.ts.net', tls: false, highRisk: [] };
+const buildLinux = (o: InstallOptions) => buildServiceConfigs(o, LINUX_SERVICE_PATHS, 'linux');
+const parseLinux = (text: string) => parseCoreConfig(text, 'linux');
 
 describe('service config', () => {
   it('builds the core, signer and approver front configs from installer options', () => {
-    const { core, signer, approver } = buildServiceConfigs({
+    const { core, signer, approver } = buildLinux({
       ...base,
       highRisk: ['Bank.Example'],
     });
@@ -45,7 +54,7 @@ describe('service config', () => {
       storePath: '/var/lib/keyflap/signer/keys.enc.json',
       highRiskDomains: ['bank.example'],
     });
-    expect(parseCoreConfig(JSON.stringify(core))).toEqual(core);
+    expect(parseLinux(JSON.stringify(core))).toEqual(core);
     expect(approver).toEqual({
       origin: 'https://box.tail1.ts.net',
       listen: { host: '127.0.0.1', port: 8766 },
@@ -56,11 +65,11 @@ describe('service config', () => {
   });
 
   it('TLS belongs to the approver front: the core never gets it next to the front', () => {
-    const { core, approver } = buildServiceConfigs({ ...base, tls: true });
+    const { core, approver } = buildLinux({ ...base, tls: true });
     expect(approver.tls).toBe(true);
     expect(core.approver.tls).toBe(false);
     const both = { ...core, approver: { ...core.approver, tls: true } };
-    expect(() => parseCoreConfig(JSON.stringify(both))).toThrow(/front/);
+    expect(() => parseLinux(JSON.stringify(both))).toThrow(/front/);
     expect(() =>
       parseApproverFrontConfig(JSON.stringify({ ...approver, upstream: 'relative.sock' })),
     ).toThrow(ConfigError);
@@ -70,7 +79,7 @@ describe('service config', () => {
   });
 
   it('Proton Pass runs inside the signer with its own session and the file key provider', () => {
-    const { core, signer } = buildServiceConfigs({
+    const { core, signer } = buildLinux({
       ...base,
       protonPassBin: '/opt/keyflap/bin/pass-cli',
       protonPassVault: 'Agent',
@@ -88,17 +97,17 @@ describe('service config', () => {
       },
     });
     expect(protonPassServiceEnv()).not.toHaveProperty('PROTON_PASS_PERSONAL_ACCESS_TOKEN');
-    expect(() => buildServiceConfigs({ ...base, protonPassVault: 'Agent' })).toThrow(ConfigError);
+    expect(() => buildLinux({ ...base, protonPassVault: 'Agent' })).toThrow(ConfigError);
   });
 
   it('1Password runs inside the signer; the token is never in a config file', () => {
-    const { core, signer } = buildServiceConfigs({
+    const { core, signer } = buildLinux({
       ...base,
       onePasswordBin: '/opt/keyflap/bin/op',
       onePasswordVault: 'Agent',
     });
     expect(core.passwordSource).toEqual({ kind: '1password' });
-    expect(parseCoreConfig(JSON.stringify(core)).passwordSource).toEqual({ kind: '1password' });
+    expect(parseLinux(JSON.stringify(core)).passwordSource).toEqual({ kind: '1password' });
     expect(signer.sources).toEqual({
       onePassword: {
         bin: '/opt/keyflap/bin/op',
@@ -107,11 +116,11 @@ describe('service config', () => {
       },
     });
     expect(JSON.stringify(signer)).not.toContain('OP_SERVICE_ACCOUNT_TOKEN');
-    expect(onePasswordServiceEnv()).toEqual({ HOME: '/var/lib/keyflap/signer' });
-    expect(() => buildServiceConfigs({ ...base, onePasswordVault: 'Agent' })).toThrow(ConfigError);
-    expect(() => buildServiceConfigs({ ...base, onePasswordBin: 'op' })).toThrow(ConfigError);
+    expect(onePasswordServiceEnv(LINUX_SERVICE_PATHS)).toEqual({ HOME: '/var/lib/keyflap/signer' });
+    expect(() => buildLinux({ ...base, onePasswordVault: 'Agent' })).toThrow(ConfigError);
+    expect(() => buildLinux({ ...base, onePasswordBin: 'op' })).toThrow(ConfigError);
     expect(() =>
-      buildServiceConfigs({
+      buildLinux({
         ...base,
         onePasswordBin: '/opt/keyflap/bin/op',
         protonPassBin: '/opt/keyflap/bin/pass-cli',
@@ -120,15 +129,15 @@ describe('service config', () => {
   });
 
   it('headed on a private Xvfb display when asked', () => {
-    const { core } = buildServiceConfigs({ ...base, xvfbBin: '/usr/bin/Xvfb' });
+    const { core } = buildLinux({ ...base, xvfbBin: '/usr/bin/Xvfb' });
     expect(core.browser).toEqual({
       mode: 'xvfb',
       xvfbBin: '/usr/bin/Xvfb',
       display: 99,
       persist: true,
     });
-    expect(parseCoreConfig(JSON.stringify(core)).browser).toEqual(core.browser);
-    expect(() => buildServiceConfigs({ ...base, xvfbBin: 'Xvfb' })).toThrow(/absolute/);
+    expect(parseLinux(JSON.stringify(core)).browser).toEqual(core.browser);
+    expect(() => buildLinux({ ...base, xvfbBin: 'Xvfb' })).toThrow(/absolute/);
   });
 
   it('on macOS the service browser is the full Chromium in new headless mode; Xvfb is refused', () => {
@@ -145,7 +154,7 @@ describe('service config', () => {
         'darwin',
       ),
     ).toThrow(/--xvfb is Linux-only/);
-    const linuxXvfb = buildServiceConfigs({ ...base, xvfbBin: '/usr/bin/Xvfb' }).core;
+    const linuxXvfb = buildLinux({ ...base, xvfbBin: '/usr/bin/Xvfb' }).core;
     expect(() => parseCoreConfig(JSON.stringify(linuxXvfb), 'darwin')).toThrow(
       /browser\.mode xvfb is Linux-only/,
     );
@@ -156,22 +165,22 @@ describe('service config', () => {
         'darwin',
       ),
     ).toThrow(/browser\.channel must be chromium/);
-    expect(buildServiceConfigs(base).core.browser).toEqual({ mode: 'headless', persist: true });
+    expect(buildLinux(base).core.browser).toEqual({ mode: 'headless', persist: true });
   });
 
   it('browser.persist: on by default, off with --ephemeral-browser, and checked', () => {
-    const { core } = buildServiceConfigs({ ...base, ephemeralBrowser: true });
+    const { core } = buildLinux({ ...base, ephemeralBrowser: true });
     expect(core.browser).toEqual({ mode: 'headless', persist: false });
-    expect(parseCoreConfig(JSON.stringify(core)).browser.persist).toBe(false);
+    expect(parseLinux(JSON.stringify(core)).browser.persist).toBe(false);
     const legacy = { ...core, browser: { mode: 'headless' } };
-    expect(parseCoreConfig(JSON.stringify(legacy)).browser.persist).toBe(true);
+    expect(parseLinux(JSON.stringify(legacy)).browser.persist).toBe(true);
     const { browser: _omit, ...noBrowser } = core;
-    expect(parseCoreConfig(JSON.stringify(noBrowser)).browser).toEqual({
+    expect(parseLinux(JSON.stringify(noBrowser)).browser).toEqual({
       mode: 'headless',
       persist: true,
     });
     expect(() =>
-      parseCoreConfig(JSON.stringify({ ...core, browser: { mode: 'headless', persist: 'no' } })),
+      parseLinux(JSON.stringify({ ...core, browser: { mode: 'headless', persist: 'no' } })),
     ).toThrow(/persist must be true or false/);
   });
 
@@ -183,9 +192,9 @@ describe('service config', () => {
       sandbox: true,
       generic: false,
     };
-    const { core } = buildServiceConfigs({ ...base, apns });
+    const { core } = buildLinux({ ...base, apns });
     expect(core.approver.apns).toEqual(apns);
-    expect(parseCoreConfig(JSON.stringify(core)).approver.apns).toEqual(apns);
+    expect(parseLinux(JSON.stringify(core)).approver.apns).toEqual(apns);
     expect(JSON.stringify(core)).not.toMatch(/PRIVATE KEY|\.p8/);
     for (const bad of [
       { ...apns, keyId: 'short' },
@@ -195,51 +204,55 @@ describe('service config', () => {
       { ...apns, keyFile: '/etc/keyflap/AuthKey.p8' },
     ]) {
       expect(() =>
-        parseCoreConfig(JSON.stringify({ ...core, approver: { ...core.approver, apns: bad } })),
+        parseLinux(JSON.stringify({ ...core, approver: { ...core.approver, apns: bad } })),
       ).toThrow(ConfigError);
     }
   });
 
   it('refuses a core config without a phone approver (D5), unknown keys, or MCP off loopback', () => {
-    const { core } = buildServiceConfigs(base);
+    const { core } = buildLinux(base);
     const without = { ...core } as Record<string, unknown>;
     delete without.approver;
-    expect(() => parseCoreConfig(JSON.stringify(without))).toThrow(/phone approver/);
-    expect(() => parseCoreConfig(JSON.stringify({ ...core, trustedApproverKeys: {} }))).toThrow(
+    expect(() => parseLinux(JSON.stringify(without))).toThrow(/phone approver/);
+    expect(() => parseLinux(JSON.stringify({ ...core, trustedApproverKeys: {} }))).toThrow(
       /unknown key "trustedApproverKeys"/,
     );
     expect(() =>
-      parseCoreConfig(JSON.stringify({ ...core, mcp: { host: '0.0.0.0', port: 8765 } })),
+      parseLinux(JSON.stringify({ ...core, mcp: { host: '0.0.0.0', port: 8765 } })),
     ).toThrow(/127\.0\.0\.1/);
     expect(() =>
-      parseCoreConfig(
+      parseLinux(
         JSON.stringify({ ...core, approver: { ...core.approver, origin: 'http://example.com' } }),
       ),
     ).toThrow(ConfigError);
     expect(() =>
-      parseCoreConfig(JSON.stringify({ ...core, browser: { mode: 'xvfb', xvfbBin: '/x' } })),
+      parseLinux(JSON.stringify({ ...core, browser: { mode: 'xvfb', xvfbBin: '/x' } })),
     ).toThrow(/display/);
-    expect(() => parseCoreConfig('not json')).toThrow(ConfigError);
+    expect(() => parseLinux('not json')).toThrow(ConfigError);
   });
 
   it('install-config writes the three files, world-readable and owner-writable only', () => {
     const dir = tmpDir();
-    installConfig([
-      '--out-dir',
-      dir,
-      '--approver-origin',
-      'https://box.tail1.ts.net',
-      '--high-risk',
-      'bank.example',
-      '--mcp-port',
-      '9876',
-    ]);
+    installConfig(
+      [
+        '--out-dir',
+        dir,
+        '--approver-origin',
+        'https://box.tail1.ts.net',
+        '--high-risk',
+        'bank.example',
+        '--mcp-port',
+        '9876',
+      ],
+      undefined,
+      'linux',
+    );
     for (const f of ['core.json', 'signer.json', 'approver.json']) {
       expect(statSync(join(dir, f)).mode & 0o777).toBe(0o644);
     }
     const front = parseApproverFrontConfig(readFileSync(join(dir, 'approver.json'), 'utf8'));
     expect(front.upstream).toBe('/run/keyflap-approver/api.sock');
-    const core = parseCoreConfig(readFileSync(join(dir, 'core.json'), 'utf8'));
+    const core = parseLinux(readFileSync(join(dir, 'core.json'), 'utf8'));
     expect(core.mcp.port).toBe(9876);
     expect(() => installConfig(['--out-dir', dir])).toThrow(/approver-origin is required/);
   });
@@ -265,21 +278,21 @@ describe('service config', () => {
   });
 
   it('the signer watches the approver address for a Tailscale name, or when a tailscale is given', () => {
-    const tailnet = buildServiceConfigs({ ...base, approverListen: '127.0.0.1:8766' }).signer;
+    const tailnet = buildLinux({ ...base, approverListen: '127.0.0.1:8766' }).signer;
     expect(tailnet.approverAddress).toEqual({
       origin: 'https://box.tail1.ts.net',
       target: 'http://127.0.0.1:8766',
     });
     const local = { ...base, approverOrigin: 'https://approver.localhost:8766' };
-    expect(buildServiceConfigs(local).signer.approverAddress).toBeUndefined();
+    expect(buildLinux(local).signer.approverAddress).toBeUndefined();
     expect(
-      buildServiceConfigs({ ...local, tailscaleBin: '/usr/bin/tailscale' }).signer.approverAddress,
+      buildLinux({ ...local, tailscaleBin: '/usr/bin/tailscale' }).signer.approverAddress,
     ).toEqual({
       origin: 'https://approver.localhost:8766',
       target: 'http://127.0.0.1:8766',
       tailscale: { via: 'cli', bin: '/usr/bin/tailscale' },
     });
-    expect(() => buildServiceConfigs({ ...local, tailscaleBin: 'tailscale' })).toThrow(
+    expect(() => buildLinux({ ...local, tailscaleBin: 'tailscale' })).toThrow(
       /--tailscale-bin must be an absolute path/,
     );
   });
@@ -330,15 +343,14 @@ describe('service config', () => {
     );
     expect(existsSync(join(dir, 'signer.json'))).toBe(false);
     expect(() =>
-      buildServiceConfigs({
+      buildLinux({
         ...base,
         tailscaleBin: '/usr/bin/tailscale',
         tailscaleLocalApi: '/Library/Tailscale',
       }),
     ).toThrow(/--tailscale-bin and --tailscale-localapi: one or the other/);
     expect(
-      buildServiceConfigs({ ...base, tailscaleLocalApi: '/Library/Tailscale' }).signer
-        .approverAddress,
+      buildLinux({ ...base, tailscaleLocalApi: '/Library/Tailscale' }).signer.approverAddress,
     ).toEqual({
       origin: 'https://box.tail1.ts.net',
       target: 'http://127.0.0.1:8766',
@@ -358,7 +370,9 @@ describe('service config', () => {
   it('service mode is the installed wrapper, never a checkout run', () => {
     expect(isServiceMode({})).toBe(false);
     expect(isServiceMode({ KEYFLAP_MODE: 'service' })).toBe(true);
-    expect(SERVICE_PATHS.adminSocket).toBe('/run/keyflap/admin.sock');
+    expect(servicePaths('linux').adminSocket).toBe('/run/keyflap/admin.sock');
+    expect(servicePaths('darwin').adminSocket).toBe('/Library/Keyflap/run/core/admin.sock');
+    expect(SERVICE_PATHS).toBe(servicePaths(process.platform));
   });
 
   it('Xauthority entry: FamilyWild, display number, MIT-MAGIC-COOKIE-1', () => {
