@@ -35,7 +35,8 @@ token works without the app and can be limited to one vault, read only.
    that vault only. Save its token
    (`ops_...`) somewhere only you can read; 1Password shows it once.
 4. `keyflap setup` (step 5, Credentials > 1Password) checks the token with `op vault list`,
-   lets you pick the vault and records the choice; it never saves the token. Or by hand:
+   lets you pick the vault and records the choice. In dev mode it never saves the token; in
+   service mode it stores the token for the signer, as `password-source add` does. Or by hand:
    start the daemon with the token in its environment, read without echo so it never
    reaches your shell history or a command line:
 
@@ -70,7 +71,8 @@ The signer runs `op` only from a path nobody but root can change, exactly like `
 (`@aab/sources` tool.ts, security review H3): `/opt/keyflap/tools/op/op`, `/usr/local/bin/op`
 or `/usr/bin/op` (searched in that order, never your PATH), root-owned all the way up, and
 with its SHA-256 pinned in `/etc/keyflap/signer.json`. Install it as root from 1Password's
-apt/dnf repository or its signed release, never a copy from your home:
+apt/dnf repository or its signed release, never a copy from your home (on a Mac, `-g wheel`
+in place of `-g root`):
 
 ```sh
 sudo install -d -m 0755 /opt/keyflap/tools/op
@@ -79,12 +81,14 @@ sudo install -o root -g root -m 0755 <the verified op> /opt/keyflap/tools/op/op
 
 After `op` updates, check the new binary is genuine and re-pin it with
 `sudo keyflap password-source trust op` (until then the signer refuses it:
-`source_tool_changed`, and `sudo keyflap doctor` says so; on a Mac, the group is `wheel`). On
-Linux the installer seals the token as a systemd credential that only the signer service can read. On a Mac it is a 0400 file only
-`_keyflap-signer` can read. It is never written to a config file:
+`source_tool_changed`, and `sudo keyflap doctor` says so). On Linux the token is sealed as a
+systemd credential that only the signer service can read. On a Mac it is a 0400 file only
+`_keyflap-signer` can read. It is never written to a config file. To choose 1Password at
+install time, pick it in the one command, or run your release's `install.sh` (in
+`/opt/keyflap-release/keyflap-<version>-<os>-<arch>/`) with:
 
 ```sh
-sudo packages/install/linux/install.sh --bundle /tmp/keyflap-bundle --approver-origin https://HOST:8766 \
+sudo ./install.sh --approver-origin https://HOST:8766 \
   --password-source 1password --1password-vault Agent [--op-bin PATH] [--op-token-file FILE]
 ```
 

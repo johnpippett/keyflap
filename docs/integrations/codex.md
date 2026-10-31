@@ -44,7 +44,7 @@ description = "Workspace editing; the Keyflap data dir is denied to commands"
 extends = ":workspace"
 
 [permissions.keyflap-protected.filesystem]
-"/home/you/.keyflap" = "deny"      # service mode: "/var/lib/keyflap/hook"
+"/home/you/.keyflap" = "deny"      # service mode: "/var/lib/keyflap/hook" (Mac: "/Library/Keyflap/hook")
 
 [mcp_servers.keyflap]
 url = "http://127.0.0.1:8765/mcp"
@@ -145,7 +145,8 @@ Codex's sandbox:
   keeps unreadable; the token is what must never leak.
 
 In service mode the broker is isolated from your user, but your copy of the host token
-(`/var/lib/keyflap/hook/host-token`) is still yours: deny `/var/lib/keyflap/hook` the same way
+(`/var/lib/keyflap/hook/host-token`, on a Mac `/Library/Keyflap/hook/host-token`) is still
+yours: deny `/var/lib/keyflap/hook` (on a Mac, `/Library/Keyflap/hook`) the same way
 ([service-mode.md](service-mode.md)).
 
 ## Known limits

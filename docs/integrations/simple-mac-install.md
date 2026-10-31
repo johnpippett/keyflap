@@ -62,7 +62,7 @@ launchctl kickstart -k gui/$(id -u)/com.keyflap.simple     # restart it
 ## The console
 
 `"$K"` with no command, in a terminal, opens the same full-screen console as `sudo keyflap` in
-the full install (see [service-mode.md](service-mode.md#the-console)). It starts with a warning
+the full install (see [service-mode.md](service-mode.md#using-it)). It starts with a warning
 screen, a big `!` and "This is the unprotected version of Keyflap.", and every screen after it
 says `! UNPROTECTED` at the top, so you can't mistake it for the protected one.
 

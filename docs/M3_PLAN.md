@@ -1,5 +1,8 @@
 # M3 plan: passwords and TOTP
 
+Status: **done**. Invariant tests: IMPLEMENTATION_NOTES "Status". Phase 2 done: Proton Pass,
+then 1Password.
+
 Scope (section 15): fill flow, redaction, post-fill verification, first external
 `CredentialSource` adapter. Invariant test: 8. Phase 1 (this plan, built first) is
 everything except the external adapter; phase 2 is the adapter, once the owner picks

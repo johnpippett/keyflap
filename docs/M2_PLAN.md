@@ -1,5 +1,7 @@
 # M2 plan: agent surface
 
+Status: **done**. Invariant tests: IMPLEMENTATION_NOTES "Status".
+
 Scope (section 15): MCP server, mediated browser tools, intent hook with one reference
 host integration, auto-deny without intent, audit log. Invariant tests: 1, 4, 5, 7, 10.
 

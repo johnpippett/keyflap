@@ -1,7 +1,8 @@
 # Keyflap — Architecture
 
 Status: the design contract. Implemented through the v1 milestones (section 15), plus
-service mode on Linux and the sessions work (saved browser state, human handoff).
+service mode on Linux and macOS, a simple no-sudo Mac install, and the sessions work (saved
+browser state, human handoff).
 Deviations and decisions are recorded in
 [IMPLEMENTATION_NOTES.md](./IMPLEMENTATION_NOTES.md). Scope: self-hosted, for a single user
 on their own machines. (Keyflap was called agent-auth-broker while it was designed; the
@@ -303,11 +304,14 @@ packages/
   mcp/         MCP server and tool definitions
   approver/    approval transports: terminal, phone web page (pairing, Web Push, handoff
                live view) and its service-mode front; native iOS API (parked)
-  sources/     CredentialSource adapters run inside the signer (Proton Pass via pass-cli)
+  sources/     CredentialSource adapters run inside the signer (Proton Pass via pass-cli,
+               1Password via op)
   test-rp/     local relying party for end-to-end tests
   cli/         `keyflap`: daemon, admin CLI (agents, passwords, approvers, policy, sessions,
-               status, audit), Claude Code hook; service-mode entry points
-  install/     service-mode installer (Linux, systemd)
+               status, audit), agent host hooks (Claude Code, Codex, Hermes), setup and the
+               console; service-mode entry points
+  install/     service-mode installers (Linux with systemd, macOS with launchd), the simple
+               Mac install, the one-command bootstrap
   isolation/   service-mode isolation tests against a third uid
 ios/           native iPhone approver (parked)
 docs/

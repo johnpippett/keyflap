@@ -21,6 +21,10 @@ moment you approve a sign-in, and only for the site you approved.
 
 ## Setup
 
+With the installed broker, choose Proton Pass in the one-command install or in
+`sudo keyflap setup`. Setup logs the signer in with your personal access token. The steps below
+are for dev mode.
+
 1. Install `pass-cli` (see Proton's docs) and log it in. A personal access token works
    (format `pst_<token>::<key>`). The broker uses that session; it never logs in itself
    and never sees the token. Keep the token off the command line (see
@@ -53,7 +57,9 @@ In service mode the signer runs `pass-cli` as `keyflap-signer` with its own sess
 only from a root-only path: a system bin directory or `/opt/keyflap/tools/pass-cli/`,
 installed by root (never a copy from your home, which your uid, and so an agent, could
 replace), and pinned by SHA-256 (`sudo keyflap password-source trust pass-cli` after an
-update). See [service-mode.md](service-mode.md#proton-pass).
+update). On a Mac, put `pass-cli` in `/opt/keyflap/tools/pass-cli/`, never Homebrew's
+`/opt/homebrew/bin`, and remove its `com.apple.quarantine` attribute first. See
+[service-mode.md](service-mode.md#proton-pass).
 
 To connect Proton Pass on a machine that is already installed, without the installer:
 
@@ -108,7 +114,8 @@ and token for the broker avoid that.
   filled there at once: the signer checks the live item every time.
 - **Sites with bot walls** block the default headless browser (it says `HeadlessChrome`;
   the broker won't disguise that). Run `keyflap daemon --headed`, on your desktop or under
-  Xvfb on a headless box (service mode does this by default: a private display only the
-  broker can reach).
+  Xvfb on a headless box (service mode on Linux does this by default: a private display only
+  the broker can reach). On a Mac the installed browser is always headless; you solve human
+  checks in the live view on your phone.
 - Matching reads every login in the vault once (about 1.5 s per login, 6 at a time),
   then only new or changed ones.

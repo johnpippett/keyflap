@@ -1,5 +1,7 @@
 # M5 plan: policy and sessions
 
+Status: **done**. Invariant tests: IMPLEMENTATION_NOTES "Status".
+
 Scope (sections 9 and 15): risk tiers per origin and agent (`deny`, `ask`, `ask-strong`,
 `allow-for(duration)`), the denylist (section 4), session TTL cleanup, CLI polish.
 Invariants touched: 4 (a live intent for every login, also inside an allow-for window),

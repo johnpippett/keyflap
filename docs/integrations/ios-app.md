@@ -112,8 +112,9 @@ The broker side needs nothing from Apple unless you want push.
 
     `--apns-generic` keeps the site's name out of the notification text (see Privacy).
 
-    In service mode, give the same `--apns-*` options to `install.sh` instead (the key
-    is sealed as a systemd credential); `sudo keyflap approver pair` shows the pairing QR.
+    In service mode, give the same `--apns-*` options to `install.sh` instead (on Linux the
+    key is sealed as a systemd credential; on a Mac it is a 0400 file only `_keyflap-core` can
+    read); `sudo keyflap approver pair` shows the pairing QR.
 
 11. **Pair**: with no phone paired (or with `--pair`), the daemon prints the one-time
     link and, on a terminal, a QR code (`keyflap approver qr` shows it again; in service mode

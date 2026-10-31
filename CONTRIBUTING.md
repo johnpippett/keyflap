@@ -25,10 +25,13 @@ Every invariant has an automated test, and a change that touches one must keep o
 those tests. Name invariant tests so they're findable (`inv9-channel.test.ts`,
 `describe('invariant 2: …')`).
 
+The e2e tests need Chromium. Install it once:
+`pnpm --filter @aab/shim exec playwright install chromium`.
+
 Run before you open a pull request:
 
 ```sh
-pnpm check            # typecheck, lint, all unit and e2e tests
+pnpm check            # typecheck, lint, the source checks, all unit and e2e tests
 pnpm test:isolation   # service mode in a throwaway systemd container (Linux + podman or docker)
 ```
 
@@ -39,8 +42,8 @@ The isolation suite also runs on a real Mac against the real install, and remove
 that Mac afterwards: `KEYFLAP_MAC=user@host packages/isolation/darwin/run-on-mac.sh` (see
 [AGENTS.md](AGENTS.md)).
 
-Tests use only the bundled test relying party (`packages/test-rp`) and the fake `pass-cli`
-(`@aab/sources/testing`). **Never test against third-party sites or a real password vault.**
+Tests use only the bundled test relying party (`packages/test-rp`) and the fake `pass-cli` or
+fake `op` (`@aab/sources/testing`). **Never test against third-party sites or a real password vault.**
 Never put real passwords, keys, tokens or one-time codes in code, tests, logs or issues.
 
 ## License
