@@ -2817,6 +2817,29 @@ No self-hosted runner is ever registered to this repository, and no workflow nam
 - **Not covered.** A runner registered in the repository's settings is outside the files;
   nothing in the repository can check it.
 
+## Faster CI, and macOS CI on pull requests (2026-11-01)
+
+The repository is public, so GitHub-hosted runner minutes are free. That removes the reason
+macOS CI ran only after merging (see "CI" under "Run on a real Mac" above). This supersedes
+that rule: macOS CI now runs on every pull request, after merging to main, and on demand.
+
+- **Linux CI in parallel.** `ci.yml` had one job of about 8 to 10 minutes, most of it the e2e
+  suite (about 6.5 to 7 minutes) after the unit tests. It now has a `static-and-unit` job
+  (`pnpm check:static`, then `pnpm test:unit`) and an `e2e` matrix job that runs
+  `pnpm test:e2e --shard=N/4` for shards 1 to 4 with `fail-fast: false`, all at once. Only the
+  e2e jobs install Chromium; the unit tests import only Playwright's types. Each e2e shard still
+  runs its files one at a time (`fileParallelism: false`).
+- **The `check` job.** It needs the other jobs, runs even when one fails, and passes only when
+  every one passed, so a required status check named `check` keeps meaning all of CI. On
+  2026-11-01 no branch protection or ruleset required it.
+- **macOS.** `macos.yml` runs `pnpm check:static` in place of separate typecheck and lint, and
+  `pnpm test:unit` with `--maxWorkers` set to the Mac's CPU count. A macOS failure still doesn't
+  block the Linux CI.
+- **Security unchanged.** Both workflows keep `permissions: contents: read`, use no secrets,
+  trigger on `pull_request` (never `pull_request_target`), check out with
+  `persist-credentials: false`, and run on GitHub-hosted runners. A fork's pull request gets a
+  read-only token, and GitHub's default approval for outside contributors' workflow runs stays.
+
 
 ## keyflap-launch: launchd socket handover (Mac M2, 2026-10-29)
 
