@@ -2,6 +2,9 @@ name: CI
 
 # GitHub-hosted runners only. The repository is public, and a fork's pull request runs the
 # workflow file it brings, so no self-hosted runner is ever registered to it.
+# The static checks and unit tests run in one job and the e2e suite in four shards, all at once.
+# The `check` job passes only when every other job passed, so a required status check named
+# `check` keeps working.
 
 on:
   push:
@@ -16,13 +19,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  static-and-unit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -30,8 +35,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:static
-      - name: Install Chromium for Playwright (with system libraries)
-        run: pnpm --filter @aab/shim exec playwright install --with-deps chromium
       # nproc ignores a container's cgroup CPU quota.
       - name: Count the CPUs this job may use
         run: |
@@ -45,4 +48,42 @@ jobs:
       - run: pnpm test:unit --maxWorkers="$JOB_CPUS"
         env:
           KEYFLAP_TEST_SHARED_WORKERS: ${{ github.event_name == 'pull_request' && '1' || '' }}
-      - run: pnpm test:e2e
+
+  e2e:
+    name: e2e (shard ${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install Chromium for Playwright (with system libraries)
+        run: pnpm --filter @aab/shim exec playwright install --with-deps chromium
+      - run: pnpm test:e2e --shard=${{ matrix.shard }}/4
+
+  check:
+    if: always()
+    needs: [static-and-unit, e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Every other job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for result in $RESULTS; do
+            if [[ $result != success ]]; then exit 1; fi
+          done
