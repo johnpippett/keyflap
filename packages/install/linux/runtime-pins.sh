@@ -11,6 +11,10 @@ NODE_SHA256_linux_x64=1805bcd35e6815559bd2eb97db438d3fdb0eb3a5e6a977b7c1badca763
 NODE_SHA256_linux_arm64=6287aa46b6c375d816e63ae66d024fbbfd70404825aabdfdf898a970871d2f4b
 NODE_SHA256_darwin_arm64=037650d0839f457747396f052073fb48333d31bf5abd3c98b74da20d89ebb1ad
 CHROMIUM_REVISION=1248
+# The Chrome for Testing build put inside Playwright's revision directories: 156.0.8078.80
+# fixes CVE-2026-118306, -118331, -118348 and -118344. Independent of CHROMIUM_REVISION, and
+# it is the security patch level to bump.
+CHROME_FOR_TESTING_VERSION=156.0.8078.80
 
 # node_sha256 OS ARCH: the pinned SHA-256 of node-vNODE_VERSION-OS-ARCH.tar.xz, or nothing.
 node_sha256() {
