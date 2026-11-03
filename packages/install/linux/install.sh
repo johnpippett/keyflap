@@ -135,6 +135,8 @@ fi
 source "$here/runtime-pins.sh"
 # shellcheck source=progress.sh
 source "$here/progress.sh"
+# shellcheck source=browser.sh
+source "$here/browser.sh"
 
 usage() {
   cat <<'EOF'
@@ -478,8 +480,7 @@ upgrade=0
 [[ -f /etc/systemd/system/keyflap-core.service ]] && upgrade=1
 fetch_node=0 fetch_chromium=0
 [[ -n $node_dir || -n $node_tarball ]] || fetch_node=1
-[[ -n $browsers_dir || ( -d /opt/keyflap/browsers/chromium-$CHROMIUM_REVISION && -d /opt/keyflap/browsers/chromium_headless_shell-$CHROMIUM_REVISION ) ]] ||
-  fetch_chromium=1
+if [[ -z $browsers_dir ]] && ! browser_is_current /opt/keyflap/browsers both; then fetch_chromium=1; fi
 steps=$((6 + upgrade + fetch_chromium + start))
 [[ -n $node_dir ]] || steps=$((steps + 1 + fetch_node))
 progress_init "install · $new_version"
@@ -556,13 +557,14 @@ else
 fi
 "$stage/node/bin/node" --version | grep -q '^v22\.' || die "the runtime is not Node 22"
 
+fresh_browser=0
 if [[ -n $browsers_dir ]]; then
   mkdir "$stage/browsers"
   for d in "$browsers_dir"/chromium-"$CHROMIUM_REVISION" "$browsers_dir"/chromium_headless_shell-"$CHROMIUM_REVISION"; do
     if [[ -d $d ]]; then cp -r --no-preserve=ownership "$d" "$stage/browsers/"; fi
   done
-elif [[ -d /opt/keyflap/browsers/chromium-$CHROMIUM_REVISION && -d /opt/keyflap/browsers/chromium_headless_shell-$CHROMIUM_REVISION ]]; then
-  # Upgrade: the pinned Chromium is already there, root-owned; keep it.
+elif browser_is_current /opt/keyflap/browsers both; then
+  # Upgrade: our pinned Chrome for Testing is already there, root-owned; keep it.
   cp -r /opt/keyflap/browsers "$stage/browsers"
 else
   progress_step 'Downloading Chromium' "downloading Chromium $CHROMIUM_REVISION (Playwright's installer)"
@@ -576,6 +578,10 @@ else
   PLAYWRIGHT_BROWSERS_PATH=$stage/browsers "$stage/node/bin/node" \
     "$stage/app/packages/shim/node_modules/playwright/cli.js" install chromium >"$playwright_out"
   [[ $playwright_out == /dev/null ]] || cat "$playwright_out"
+  fresh_browser=1
+fi
+if [[ $fresh_browser -eq 1 ]]; then
+  install_chrome_for_testing "$stage/browsers" linux "$arch" both
 fi
 
 chown -R root:root "$stage"
