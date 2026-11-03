@@ -137,6 +137,7 @@ source "$here/runtime-pins.sh"
 source "$here/progress.sh"
 # shellcheck source=browser.sh
 source "$here/browser.sh"
+cft_hash_check() { printf '%s  %s\n' "$2" "$1" | sha256sum -c --quiet -; }
 
 usage() {
   cat <<'EOF'

@@ -239,6 +239,7 @@ bad=$(not_root_only "$browser")
 [[ -z $bad ]] || die "refusing to read $browser: $bad"
 # shellcheck source=../linux/browser.sh
 source "$browser"
+cft_hash_check() { printf '%s  %s\n' "$2" "$1" | shasum -a 256 -c >/dev/null; }
 
 usage() {
   cat <<'EOF'

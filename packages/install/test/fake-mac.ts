@@ -25,6 +25,8 @@ const NODE_VERSION = /NODE_VERSION=([\d.]+)/.exec(
 const CFT_VERSION = /CHROME_FOR_TESTING_VERSION=([\d.]+)/.exec(
   readFileSync(join(INSTALL, 'linux', 'runtime-pins.sh'), 'utf8'),
 )?.[1] as string;
+const CFT_FAKE_ZIP = 'fake-cft-zip';
+const CFT_FAKE_SHA256 = createHash('sha256').update(CFT_FAKE_ZIP).digest('hex');
 
 const q = (a: string) => `'${a.replaceAll("'", `'\\''`)}'`;
 const SBIN_PATH = 'PATH="$PATH:/usr/sbin:/sbin"';
@@ -67,7 +69,7 @@ case $url in
       prev=$a
     done
     [ -n "$out" ] || exit 2
-    printf '%s' "$url" >"$out" ;;
+    printf '%s' '${CFT_FAKE_ZIP}' >"$out" ;;
   *) exec /realbin/curl "$@" ;;
 esac`,
   unzip: `dir='' zip=''
@@ -224,7 +226,7 @@ function stageRelease(rel: string): void {
   const pins = readFileSync(join(INSTALL, 'linux', 'runtime-pins.sh'), 'utf8');
   writeFileSync(
     join(rel, 'runtime-pins.sh'),
-    `${pins}\nnode_sha256() { echo ${sha256(tarball)}; }\n`,
+    `${pins}\nnode_sha256() { echo ${sha256(tarball)}; }\ncft_sha256() { echo ${CFT_FAKE_SHA256}; }\n`,
   );
 }
 

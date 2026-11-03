@@ -1,10 +1,12 @@
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -14,11 +16,14 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 const LINUX = join(import.meta.dirname, '..', 'linux');
+const MACOS = join(import.meta.dirname, '..', 'macos');
 const PINS = join(LINUX, 'runtime-pins.sh');
 const BROWSER = join(LINUX, 'browser.sh');
 const pins = readFileSync(PINS, 'utf8');
 const CFT = /CHROME_FOR_TESTING_VERSION=(\S+)/.exec(pins)?.[1] as string;
 const REVISION = /CHROMIUM_REVISION=(\S+)/.exec(pins)?.[1] as string;
+const FAKE_ZIP = 'fake-cft-zip';
+const FAKE_HASH = createHash('sha256').update(FAKE_ZIP).digest('hex');
 
 let root = '';
 let bin = '';
@@ -36,8 +41,12 @@ beforeEach(() => {
   log = join(root, 'curl.log');
   mkdirSync(bin, { recursive: true });
   mkdirSync(browsers, { recursive: true });
+  mkdirSync(join(root, 'tmp'), { recursive: true });
   writeFileSync(log, '');
-  cpSync(PINS, join(root, 'runtime-pins.sh'));
+  writeFileSync(
+    join(root, 'runtime-pins.sh'),
+    `${pins}\ncft_sha256() { printf '%s' '${FAKE_HASH}'; }\n`,
+  );
   cpSync(BROWSER, join(root, 'browser.sh'));
   chmodSync(join(root, 'browser.sh'), 0o644);
   fake(
@@ -53,8 +62,12 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$out" ] || exit 2
+if [ -n "\${FAKE_CURL_FAIL:-}" ]; then
+  echo 'curl: (22) The requested URL returned error: 503' >&2
+  exit 22
+fi
 printf '%s\\n' "$url" >>"$FAKE_CURL_LOG"
-printf '%s' "$url" >"$out"`,
+printf '%s' '${FAKE_ZIP}' >"$out"`,
   );
   fake(
     'unzip',
@@ -89,6 +102,13 @@ function run(code: string, env: Record<string, string> = {}) {
     [
       '-c',
       `set -euo pipefail
+cft_hash_check() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    printf '%s  %s\\n' "$2" "$1" | sha256sum -c --quiet -
+  else
+    printf '%s  %s\\n' "$2" "$1" | shasum -a 256 -c >/dev/null
+  fi
+}
 source "${join(root, 'runtime-pins.sh')}"
 source "${join(root, 'browser.sh')}"
 ${code}`,
@@ -96,6 +116,8 @@ ${code}`,
     {
       env: {
         PATH: `${bin}:/usr/bin:/bin`,
+        HOME: root,
+        TMPDIR: join(root, 'tmp'),
         FAKE_CURL_LOG: log,
         FAKE_CFT_VERSION: CFT,
         ...env,
@@ -251,5 +273,35 @@ describe('browser.sh refreshes exactly the browser Playwright cannot', () => {
     expect(r.code).toBe(1);
     expect(r.out).toContain(`is not ${CFT}`);
     expect(existsSync(marker())).toBe(false);
+  });
+
+  it('refuses a download whose SHA-256 does not match the pin', () => {
+    const r = run(
+      `cft_sha256() { printf '%s' 'deadbeef'; }; install_chrome_for_testing ${browsers} linux x64 full`,
+    );
+    expect(r.code).toBe(1);
+    expect(r.out).toContain('checksum mismatch');
+    expect(existsSync(marker())).toBe(false);
+  });
+
+  it('removes its temp directory when the download fails', () => {
+    const r = run(`install_chrome_for_testing ${browsers} linux x64 full`, {
+      FAKE_CURL_FAIL: '1',
+    });
+    expect(r.code).toBe(1);
+    const leftovers = readdirSync(join(root, 'tmp')).filter((n) => n.startsWith('keyflap-cft.'));
+    expect(leftovers).toEqual([]);
+  });
+
+  it('the installers refresh a browser with an old marker instead of keeping the directory', () => {
+    expect(readFileSync(join(LINUX, 'install.sh'), 'utf8')).toContain(
+      '! browser_is_current /opt/keyflap/browsers both',
+    );
+    expect(readFileSync(join(MACOS, 'install.sh'), 'utf8')).toContain(
+      '! browser_is_current "$prefix/browsers" full',
+    );
+    expect(readFileSync(join(MACOS, 'install-simple.sh'), 'utf8')).toContain(
+      '! browser_is_current "$app/browsers" shell',
+    );
   });
 });

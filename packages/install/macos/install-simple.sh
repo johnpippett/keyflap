@@ -32,6 +32,7 @@ browser=$here/browser.sh
 [[ -f $browser ]] || browser=$here/../linux/browser.sh
 # shellcheck source=../linux/browser.sh
 source "$browser"
+cft_hash_check() { printf '%s  %s\n' "$2" "$1" | shasum -a 256 -c >/dev/null; }
 
 confirmed=0 bundle='' browsers_dir=''
 while [[ $# -gt 0 ]]; do

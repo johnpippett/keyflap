@@ -11,7 +11,10 @@
 #   install_chrome_for_testing DIR OS ARCH KIND
 #                                     -> download and swap in KIND's build (both, full or shell)
 
+cft_tmp=''
+
 cft_fail() {
+  if [[ -n ${cft_tmp:-} ]]; then rm -rf "$cft_tmp"; fi
   if command -v die >/dev/null 2>&1; then die "$*"; fi
   echo "install: $*" >&2
   exit 1
@@ -94,7 +97,7 @@ browser_is_current() {
 
 install_chrome_for_testing() {
   local browsers=$1 os=$2 arch=$3 kinds=$4
-  local platform kind asset inner revision tmp url exe version
+  local platform kind asset inner revision expected url exe version
   platform=$(cft_platform "$os" "$arch") || cft_fail "no Chrome for Testing build for $os-$arch"
   case $kinds in
     both) kinds='full shell' ;;
@@ -105,15 +108,19 @@ install_chrome_for_testing() {
     asset=$(cft_asset "$platform" "$kind") || cft_fail "no $kind Chrome for Testing asset for $platform"
     inner=$(cft_inner "$platform" "$kind") || cft_fail "no $kind Chrome for Testing directory for $platform"
     revision=$(cft_revision "$kind") || cft_fail "unknown browser kind $kind"
-    tmp=$(mktemp -d "${TMPDIR:-/tmp}/keyflap-cft.XXXXXX")
+    cft_tmp=$(mktemp -d "${TMPDIR:-/tmp}/keyflap-cft.XXXXXX")
     url=https://storage.googleapis.com/chrome-for-testing-public/$CHROME_FOR_TESTING_VERSION/$platform/$asset
-    curl -fSL --proto '=https' --tlsv1.2 -o "$tmp/$asset" "$url" ||
+    curl -fSL --proto '=https' --tlsv1.2 -o "$cft_tmp/$asset" "$url" ||
       cft_fail "the Chrome for Testing download failed: $url"
-    unzip -q "$tmp/$asset" -d "$tmp" || cft_fail "cannot unpack Chrome for Testing: $asset"
-    [[ -d $tmp/$inner ]] || cft_fail "$asset has no $inner directory"
+    expected=$(cft_sha256 "$platform" "$kind") || cft_fail "no pinned SHA-256 for $platform $kind"
+    [[ -n $expected ]] || cft_fail "no pinned SHA-256 for $platform $kind"
+    cft_hash_check "$cft_tmp/$asset" "$expected" ||
+      cft_fail "Chrome for Testing checksum mismatch: $asset"
+    unzip -q "$cft_tmp/$asset" -d "$cft_tmp" || cft_fail "cannot unpack Chrome for Testing: $asset"
+    [[ -d $cft_tmp/$inner ]] || cft_fail "$asset has no $inner directory"
     rm -rf "${browsers:?}/$revision/$inner"
     mkdir -p "$browsers/$revision"
-    mv "$tmp/$inner" "$browsers/$revision/$inner"
+    mv "$cft_tmp/$inner" "$browsers/$revision/$inner"
     : >"$browsers/$revision/INSTALLATION_COMPLETE"
     : >"$browsers/$revision/DEPENDENCIES_VALIDATED"
     exe=$(cft_exe "$platform" "$kind" "$browsers/$revision/$inner") ||
@@ -124,7 +131,8 @@ install_chrome_for_testing() {
       *) cft_fail "$exe runs $version, which is not $CHROME_FOR_TESTING_VERSION" ;;
     esac
     if command -v dequarantine >/dev/null 2>&1; then dequarantine "$browsers/$revision/$inner"; fi
-    rm -rf "$tmp"
+    rm -rf "$cft_tmp"
+    cft_tmp=''
   done
   printf '%s\n' "$CHROME_FOR_TESTING_VERSION" >"$browsers/.chrome-for-testing-version"
 }
