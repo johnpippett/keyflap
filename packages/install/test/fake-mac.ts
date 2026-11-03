@@ -22,6 +22,9 @@ export const RELEASE = `/opt/keyflap-release/keyflap-${VERSION}-darwin-arm64`;
 const NODE_VERSION = /NODE_VERSION=([\d.]+)/.exec(
   readFileSync(join(INSTALL, 'linux', 'runtime-pins.sh'), 'utf8'),
 )?.[1] as string;
+const CFT_VERSION = /CHROME_FOR_TESTING_VERSION=([\d.]+)/.exec(
+  readFileSync(join(INSTALL, 'linux', 'runtime-pins.sh'), 'utf8'),
+)?.[1] as string;
 
 const q = (a: string) => `'${a.replaceAll("'", `'\\''`)}'`;
 const SBIN_PATH = 'PATH="$PATH:/usr/sbin:/sbin"';
@@ -52,6 +55,39 @@ const FAKES: Record<string, string> = {
   chown: 'exit 0',
   xattr: 'case $1 in -p) exit 1 ;; *) exit 0 ;; esac',
   shasum: '[ "$1" = -a ] && shift 2; exec sha256sum "$@"',
+  curl: `url=''
+for a in "$@"; do
+  case $a in http://*|https://*) url=$a ;; esac
+done
+case $url in
+  https://storage.googleapis.com/chrome-for-testing-public/*)
+    out='' prev=''
+    for a in "$@"; do
+      [ "$prev" = -o ] && out=$a
+      prev=$a
+    done
+    [ -n "$out" ] || exit 2
+    printf '%s' "$url" >"$out" ;;
+  *) exec /realbin/curl "$@" ;;
+esac`,
+  unzip: `dir='' zip=''
+while [ $# -gt 0 ]; do
+  case $1 in
+    -d) dir=$2; shift 2 ;;
+    -q) shift ;;
+    *) zip=$1; shift ;;
+  esac
+done
+[ -n "$dir" ] && [ -n "$zip" ] || exit 2
+inner=$(basename "$zip" .zip)
+case $inner in
+  chrome-headless-shell-*) exe=chrome-headless-shell ;;
+  chrome-mac-*) exe='Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing' ;;
+  *) exe=chrome ;;
+esac
+mkdir -p "$dir/$inner/$(dirname "$exe")"
+printf '#!/bin/sh\\necho "Google Chrome for Testing ${CFT_VERSION}"\\n' >"$dir/$inner/$exe"
+chmod 0755 "$dir/$inner/$exe"`,
   tailscale: `[ "$1" = status ] || exit 2
 echo '{"BackendState": "Running", "Self": {"DNSName": "mac.tail1234.ts.net."}, "CertDomains": ["mac.tail1234.ts.net"]}'`,
   chmod: 'case $1 in +a|-a*) exit 0 ;; *) exec /realbin/chmod "$@" ;; esac',
@@ -161,6 +197,7 @@ function stageRelease(rel: string): void {
   }
   cpSync(join(INSTALL, 'macos', 'launchd'), join(rel, 'launchd'), { recursive: true });
   cpSync(join(INSTALL, 'linux', 'progress.sh'), join(rel, 'progress.sh'));
+  cpSync(join(INSTALL, 'linux', 'browser.sh'), join(rel, 'browser.sh'));
   writeFileSync(join(rel, 'keyflap-launch'), Buffer.from([0xcf, 0xfa, 0xed, 0xfe, 0, 0, 0, 0]));
   const app = join(rel, 'bundle', 'app');
   mkdirSync(join(app, 'packages/cli/src/service'), { recursive: true });

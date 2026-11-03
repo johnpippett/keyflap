@@ -28,6 +28,10 @@ For the full install, which does need sudo: $full_install"
 
 # shellcheck source=../linux/runtime-pins.sh
 source "$here/runtime-pins.sh"
+browser=$here/browser.sh
+[[ -f $browser ]] || browser=$here/../linux/browser.sh
+# shellcheck source=../linux/browser.sh
+source "$browser"
 
 confirmed=0 bundle='' browsers_dir=''
 while [[ $# -gt 0 ]]; do
@@ -142,7 +146,7 @@ dequarantine "$stage/node"
 
 shell_dir=chromium_headless_shell-$CHROMIUM_REVISION
 new_browsers=0
-if [[ ! -d $app/browsers/$shell_dir ]]; then
+if ! browser_is_current "$app/browsers" shell; then
   new_browsers=1
   if [[ -n $browsers_dir ]]; then
     mkdir "$stage/browsers"
@@ -151,6 +155,7 @@ if [[ ! -d $app/browsers/$shell_dir ]]; then
     step "downloading Chromium $CHROMIUM_REVISION (Playwright's headless shell)"
     PLAYWRIGHT_BROWSERS_PATH=$stage/browsers "$stage/node/bin/node" \
       "$stage/app/packages/shim/node_modules/playwright/cli.js" install --only-shell chromium >/dev/null
+    install_chrome_for_testing "$stage/browsers" darwin arm64 shell
   fi
   dequarantine "$stage/browsers"
 fi

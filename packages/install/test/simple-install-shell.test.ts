@@ -31,6 +31,7 @@ beforeEach(() => {
     join(release, 'runtime-pins.sh'),
     spawnSync('cat', [join(LINUX, 'runtime-pins.sh')]).stdout,
   );
+  writeFileSync(join(release, 'browser.sh'), spawnSync('cat', [join(LINUX, 'browser.sh')]).stdout);
   writeFileSync(join(release, 'RELEASE'), 'name=keyflap\nversion=1.0.0\nos=darwin\narch=arm64\n');
   mkdirSync(join(release, 'bundle', 'app', 'packages', 'cli', 'src'), { recursive: true });
   writeFileSync(join(release, 'bundle', '.keyflap-bundle'), '');

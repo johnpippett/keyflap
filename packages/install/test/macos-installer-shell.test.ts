@@ -8,7 +8,11 @@ const LINUX = join(import.meta.dirname, '..', 'linux');
 const SCRIPTS = ['install.sh', 'uninstall.sh', 'install-simple.sh', 'uninstall-simple.sh'].map(
   (f) => join(MACOS, f),
 );
-const SOURCED = [join(LINUX, 'runtime-pins.sh'), join(LINUX, 'progress.sh')];
+const SOURCED = [
+  join(LINUX, 'runtime-pins.sh'),
+  join(LINUX, 'progress.sh'),
+  join(LINUX, 'browser.sh'),
+];
 
 const code = (text: string) =>
   text
