@@ -205,11 +205,11 @@ for target in "${targets[@]}"; do
   mkdir -p "$d"
   if [[ $os == linux ]]; then
     cp "$here/install.sh" "$here/uninstall.sh" "$here/keyflap-wrapper.sh" "$here/runtime-pins.sh" \
-      "$here/progress.sh" "$here/sysusers.conf" "$here/tmpfiles.conf" "$d/"
+      "$here/progress.sh" "$here/browser.sh" "$here/sysusers.conf" "$here/tmpfiles.conf" "$d/"
     cp -r "$here/units" "$d/units"
   else
     cp "$macos/install.sh" "$macos/uninstall.sh" "$macos/keyflap-wrapper.sh" "$here/runtime-pins.sh" \
-      "$here/progress.sh" "$macos/install-simple.sh" "$macos/uninstall-simple.sh" "$d/"
+      "$here/progress.sh" "$here/browser.sh" "$macos/install-simple.sh" "$macos/uninstall-simple.sh" "$d/"
     chmod 0755 "$d/install-simple.sh" "$d/uninstall-simple.sh"
     cp -r "$macos/launchd" "$d/launchd"
     cp "$launcher" "$d/keyflap-launch"

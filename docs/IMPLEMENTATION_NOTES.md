@@ -2268,6 +2268,15 @@ visits arbitrary sites, so a Chromium months behind on security fixes is a real 
   `runtime-pins.sh` (`CHROMIUM_REVISION`, which `build-bundle.sh` checks against the bundled
   `playwright-core`), in the demo image digest, and in the isolation tests' `chromium-1248`
   paths. All of these moved together.
+- **Browser patch level: Chrome for Testing 156.0.8078.80 (2026-11-02).** Playwright 1.64.1
+  still pins revision 1248, and that build is Chrome for Testing 156.0.8078.4. The four
+  critical fixes in 156.0.8078.73 are CVE-2026-118306, CVE-2026-118331, CVE-2026-118348 and
+  CVE-2026-118344. The installers keep Playwright's revision directory but replace the browser
+  with the pinned Chrome for Testing build. `runtime-pins.sh` pins the version and the SHA-256
+  of each full and headless-shell archive. The installers verify the hash before they unpack
+  the archive and fail closed on a mismatch. A `.chrome-for-testing-version` marker makes an
+  upgrade refresh an older browser, including a v0.1.0 install that has no marker.
+  `CHROMIUM_REVISION` and the app code do not change.
 - **Chromium's directory moved.** From this revision, Chrome for Testing unpacks into
   `chrome-linux64/` and `chrome-headless-shell-linux64/` (it used to be `chrome-linux/`).
   No product code names those directories (Playwright resolves the executable itself), but

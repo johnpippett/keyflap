@@ -233,6 +233,13 @@ bad=$(not_root_only "$progress")
 [[ -z $bad ]] || die "refusing to read $progress: $bad"
 # shellcheck source=../linux/progress.sh
 source "$progress"
+browser=$here/browser.sh
+[[ -f $browser ]] || browser=$here/../linux/browser.sh
+bad=$(not_root_only "$browser")
+[[ -z $bad ]] || die "refusing to read $browser: $bad"
+# shellcheck source=../linux/browser.sh
+source "$browser"
+cft_hash_check() { printf '%s  %s\n' "$2" "$1" | shasum -a 256 -c >/dev/null; }
 
 usage() {
   cat <<'EOF'
@@ -285,8 +292,8 @@ usage: sudo ./install.sh --approver-origin URL [options]        (from a release 
   --node-tarball FILE       use this node-v22.23.4-darwin-arm64.tar.xz (still checksum-verified;
                             default: the one in the release tarball, else download it)
   --node-dir DIR            copy this Node 22 install instead (offline/tests; you vouch for it)
-  --browsers-dir DIR        copy Playwright's chromium-1248 from DIR instead of downloading
-                            (offline/tests; you vouch for it)
+  --browsers-dir DIR        copy the browser layout from DIR instead of downloading
+                            (offline/tests; you vouch for its Chrome version)
   --no-start                install everything but don't start the services (they start at
                             the next boot, or: sudo launchctl bootstrap system /Library/LaunchDaemons/com.keyflap.NAME.plist)
 
@@ -412,7 +419,7 @@ macos=$(sw_vers -productVersion 2>/dev/null || echo 0)
 if [[ ${macos%%.*} -lt 14 ]]; then
   problem "macOS $macos is too old: service mode needs macOS 14 or later (tested on 26)"
 fi
-for tool in dscl dscacheutil launchctl plutil shasum xattr install find tar; do
+for tool in dscl dscacheutil launchctl plutil shasum xattr install find tar curl unzip; do
   command -v "$tool" >/dev/null || problem "$tool not found (part of macOS)"
 done
 filevault=$(fdesetup status 2>/dev/null || echo unknown)
@@ -573,7 +580,7 @@ upgrade=0
 [[ -f $daemons/com.keyflap.core.plist ]] && upgrade=1
 fetch_node=0 fetch_chromium=0
 [[ -n $node_dir || -n $node_tarball ]] || fetch_node=1
-[[ -n $browsers_dir || -d $prefix/browsers/chromium-$CHROMIUM_REVISION ]] || fetch_chromium=1
+if [[ -z $browsers_dir ]] && ! browser_is_current "$prefix/browsers" full; then fetch_chromium=1; fi
 steps=$((6 + upgrade + fetch_chromium + start))
 [[ -n $node_dir ]] || steps=$((steps + 1 + fetch_node))
 [[ -z $tailscale_localapi ]] || steps=$((steps + 1))
@@ -724,13 +731,22 @@ else
   rm -f "$stage/node.tar.xz"
 fi
 dequarantine "$stage/node"
-"$stage/node/bin/node" --version | grep -q '^v22\.' || die "the runtime is not Node 22"
+node_version=$("$stage/node/bin/node" --version)
+if [[ -n $node_dir ]]; then
+  [[ $node_version == v22.* ]] || die "the runtime is not Node 22"
+  [[ $node_version == "v$NODE_VERSION" ]] || echo "install: warning: --node-dir runs $node_version, not the pinned v$NODE_VERSION" >&2
+else
+  [[ $node_version == "v$NODE_VERSION" ]] || die "the runtime is not Node $NODE_VERSION"
+fi
 
+fresh_browser=0
 if [[ -n $browsers_dir ]]; then
+  browser_is_current "$browsers_dir" full ||
+    echo "install: warning: --browsers-dir has no $CHROME_FOR_TESTING_VERSION marker; you are vouching for its browser version" >&2
   mkdir "$stage/browsers"
   cp -R "$browsers_dir/chromium-$CHROMIUM_REVISION" "$stage/browsers/"
-elif [[ -d $prefix/browsers/chromium-$CHROMIUM_REVISION ]]; then
-  # Upgrade: the pinned Chromium is already there, root-owned; keep it.
+elif browser_is_current "$prefix/browsers" full; then
+  # Upgrade: our pinned Chrome for Testing is already there, root-owned; keep it.
   cp -R "$prefix/browsers" "$stage/browsers"
 else
   progress_step 'Downloading Chromium' "downloading Chromium $CHROMIUM_REVISION (Playwright's installer)"
@@ -745,6 +761,10 @@ else
   PLAYWRIGHT_BROWSERS_PATH=$stage/browsers "$stage/node/bin/node" \
     "$stage/app/packages/shim/node_modules/playwright/cli.js" install --no-shell chromium >"$playwright_out"
   [[ $playwright_out == /dev/null ]] || cat "$playwright_out"
+  fresh_browser=1
+fi
+if [[ $fresh_browser -eq 1 ]]; then
+  install_chrome_for_testing "$stage/browsers" darwin arm64 full
 fi
 dequarantine "$stage/browsers"
 
