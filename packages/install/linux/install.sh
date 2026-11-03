@@ -184,8 +184,8 @@ usage: sudo ./install.sh --approver-origin URL [options]        (from a release 
   --node-tarball FILE       use this node-v22.23.4-linux-*.tar.xz (still checksum-verified;
                             default: the one in the release tarball, else download it)
   --node-dir DIR            copy this Node 22 install instead (offline/tests; you vouch for it)
-  --browsers-dir DIR        copy Playwright browsers from DIR instead of downloading
-                            (offline/tests; you vouch for it)
+  --browsers-dir DIR        copy the browser layout from DIR instead of downloading
+                            (offline/tests; you vouch for its Chrome version)
   --no-start                install everything but don't start the services
 
 Re-running upgrades: pass the same options again (the configuration is rewritten from them).
@@ -352,6 +352,12 @@ else
   command -v tar >/dev/null || problem "tar not found"
   command -v xz >/dev/null ||
     problem "xz not found: needed to unpack Node (Debian/Ubuntu: xz-utils, Fedora: xz, Arch: xz)"
+fi
+if [[ -z $browsers_dir ]] && ! browser_is_current /opt/keyflap/browsers both; then
+  command -v curl >/dev/null ||
+    problem "curl not found: needed to download Chrome for Testing"
+  command -v unzip >/dev/null ||
+    problem "unzip not found: needed to unpack Chrome for Testing (Debian/Ubuntu: unzip, Fedora: unzip, Arch: unzip)"
 fi
 
 # The managed browser: headed on Xvfb unless --headless.
@@ -555,10 +561,18 @@ else
   tar -xJf "$stage/node.tar.xz" -C "$stage/node" --strip-components=1 --no-same-owner
   rm -f "$stage/node.tar.xz"
 fi
-"$stage/node/bin/node" --version | grep -q '^v22\.' || die "the runtime is not Node 22"
+node_version=$("$stage/node/bin/node" --version)
+if [[ -n $node_dir ]]; then
+  [[ $node_version == v22.* ]] || die "the runtime is not Node 22"
+  [[ $node_version == "v$NODE_VERSION" ]] || echo "install: warning: --node-dir runs $node_version, not the pinned v$NODE_VERSION" >&2
+else
+  [[ $node_version == "v$NODE_VERSION" ]] || die "the runtime is not Node $NODE_VERSION"
+fi
 
 fresh_browser=0
 if [[ -n $browsers_dir ]]; then
+  browser_is_current "$browsers_dir" both ||
+    echo "install: warning: --browsers-dir has no $CHROME_FOR_TESTING_VERSION marker; you are vouching for its browser version" >&2
   mkdir "$stage/browsers"
   for d in "$browsers_dir"/chromium-"$CHROMIUM_REVISION" "$browsers_dir"/chromium_headless_shell-"$CHROMIUM_REVISION"; do
     if [[ -d $d ]]; then cp -r --no-preserve=ownership "$d" "$stage/browsers/"; fi

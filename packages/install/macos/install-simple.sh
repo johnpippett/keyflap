@@ -5,8 +5,8 @@
 #   ./install-simple.sh            # from an extracted keyflap-V-darwin-arm64 release, as you
 #
 # It protects less than the full install (./install.sh with sudo), and says so before it
-# installs anything. As you, it puts the code, a pinned Node 22 and Playwright's headless
-# Chromium in ~/Library/Application Support/Keyflap, with the keyflap command in its bin/.
+# installs anything. As you, it puts the code, a pinned Node 22 and Chrome for Testing's
+# headless shell in ~/Library/Application Support/Keyflap, with the keyflap command in its bin/.
 # Run that command's `setup` next (the one-command install does): it pairs your phone, adds
 # your agent, and starts the broker as the LaunchAgent com.keyflap.simple. The key store lives
 # in ~/.keyflap and unlocks from the key file ~/.keyflap/unlock.key (0600), so the broker
@@ -142,13 +142,15 @@ mkdir "$stage/node"
 tar -xJf "$stage/node.tar.xz" -C "$stage/node" --strip-components=1
 rm -f "$stage/node.tar.xz"
 dequarantine "$stage/node"
-"$stage/node/bin/node" --version | grep -q '^v22\.' || die "the runtime is not Node 22"
+[[ $("$stage/node/bin/node" --version) == "v$NODE_VERSION" ]] || die "the runtime is not Node $NODE_VERSION"
 
 shell_dir=chromium_headless_shell-$CHROMIUM_REVISION
 new_browsers=0
 if ! browser_is_current "$app/browsers" shell; then
   new_browsers=1
   if [[ -n $browsers_dir ]]; then
+    browser_is_current "$browsers_dir" shell ||
+      echo "install: warning: --browsers-dir has no $CHROME_FOR_TESTING_VERSION marker; you are vouching for its browser version" >&2
     mkdir "$stage/browsers"
     cp -R "$browsers_dir/$shell_dir" "$stage/browsers/"
   else
