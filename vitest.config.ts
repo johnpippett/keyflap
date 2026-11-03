@@ -1,4 +1,5 @@
 import { defineConfig } from 'vitest/config';
+import { E2E_EXCLUDE, E2E_INCLUDE } from './scripts/lib/e2e-files.ts';
 import { findModuleMockingFiles } from './scripts/lib/module-mocks.ts';
 
 const unitInclude = ['packages/*/test/**/*.test.ts', 'scripts/**/*.test.ts'];
@@ -42,8 +43,8 @@ export default defineConfig({
       {
         test: {
           name: 'e2e',
-          include: ['packages/*/test/**/*.e2e.test.ts'],
-          exclude: ['packages/isolation/**'],
+          include: E2E_INCLUDE,
+          exclude: E2E_EXCLUDE,
           testTimeout: 60_000,
           hookTimeout: 60_000,
           fileParallelism: false,

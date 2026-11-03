@@ -1,0 +1,73 @@
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+import { assignShards, e2eFiles, planFor, readPlans, totalSeconds } from './e2e-shards.ts';
+
+const root = fileURLToPath(new URL('../..', import.meta.url));
+const plans = readPlans(fileURLToPath(new URL('../e2e-durations.json', import.meta.url)));
+const files = e2eFiles(root);
+const platforms = [
+  ['linux', plans.linux],
+  ['darwin', plans.darwin],
+] as const;
+
+describe('e2e shard plan', () => {
+  for (const [platform, durations] of platforms) {
+    describe(platform, () => {
+      it('assigns every e2e file exactly once', () => {
+        for (const count of [1, 2, 4, 6, 8]) {
+          const shards = assignShards(files, durations, count);
+          expect(shards).toHaveLength(count);
+          expect(shards.flat().sort()).toEqual(files);
+          for (const shard of shards) expect(shard.length).toBeGreaterThan(0);
+        }
+      });
+
+      it('is deterministic', () => {
+        expect(assignShards(files, durations, 6)).toEqual(assignShards(files, durations, 6));
+      });
+
+      it('keeps the planned shard counts within 15% of an even load', () => {
+        for (const count of [4, 6]) {
+          const shards = assignShards(files, durations, count);
+          const loads = shards.map((shard) => totalSeconds(shard, durations));
+          const mean = totalSeconds(files, durations) / shards.length;
+          expect(Math.max(...loads)).toBeLessThanOrEqual(mean * 1.15);
+        }
+      });
+
+      it('has a measured time for every e2e file', () => {
+        const unmeasured = files.filter((file) => durations.seconds[file] === undefined);
+        expect(unmeasured, 'add the file to scripts/e2e-durations.json').toEqual([]);
+      });
+
+      it('has no measured file that no longer exists', () => {
+        expect(Object.keys(durations.seconds).filter((file) => !files.includes(file))).toEqual([]);
+      });
+    });
+  }
+
+  it('selects the plan for the platform', () => {
+    expect(planFor(plans, 'darwin')).toBe(plans.darwin);
+    expect(planFor(plans, 'linux')).toBe(plans.linux);
+    expect(planFor(plans, 'win32')).toBe(plans.linux);
+  });
+
+  it('never lets one planned file filter another', () => {
+    const collisions = files.filter((file) =>
+      files.some((other) => other !== file && other.includes(file)),
+    );
+    expect(collisions).toEqual([]);
+  });
+
+  it('rejects impossible shard counts', () => {
+    expect(() => assignShards(files, plans.linux, 0)).toThrow();
+    expect(() => assignShards(files, plans.linux, -1)).toThrow();
+    expect(() => assignShards(files, plans.linux, 2.5)).toThrow();
+    expect(() => assignShards(files, plans.linux, files.length + 1)).toThrow();
+  });
+
+  it('rejects a duplicate file', () => {
+    const first = files[0] ?? '';
+    expect(() => assignShards([...files, first], plans.linux, 2)).toThrow();
+  });
+});

@@ -2849,6 +2849,48 @@ that rule: macOS CI now runs on every pull request, after merging to main, and o
   `persist-credentials: false`, and run on GitHub-hosted runners. A fork's pull request gets a
   read-only token, and GitHub's default approval for outside contributors' workflow runs stays.
 
+## CI: planned e2e shards and sharded unit tests (2026-11-02)
+
+The four count-balanced e2e shards were uneven by wall clock: 145 s, 101 s, 69 s and 58 s in run
+41559401063. Vitest shards by hashed file order in contiguous chunks, so the load is effectively
+random, and one file (`packages/core/test/swipe-approval.e2e.test.ts`, 16 tests, about 63 s) is a
+sixth of the suite. A count split cannot fix that; the shard holding the swipe file starts at 63 s.
+
+- **Planned e2e shards.** `scripts/e2e-shard.ts <index> <count>` prints the files for one shard,
+  assigned longest-first from `scripts/e2e-durations.json` (per-file seconds measured from that
+  run). The plan puts six shards within a second of each other (62.8 to 63.3 s) and leaves the
+  swipe file alone in its shard. The workflow matrix runs six shards and passes each one its
+  planned files to `vitest run --project e2e`. `scripts/lib/e2e-files.ts` holds the e2e include
+  and exclude, and `vitest.config.ts` imports the same constants, so the plan cannot drift from
+  what Vitest runs.
+- **Guard test.** `scripts/lib/e2e-shards.test.ts` checks every e2e file appears exactly once,
+  the plan is deterministic and within 15% of an even load, no measured file has been deleted, no
+  planned path is a substring of another (positional filters are substring matches), and bad shard
+  counts throw. A new e2e file without a duration fails this test on purpose: add it to
+  `scripts/e2e-durations.json` in the same pull request.
+- **Unit shards.** The old `static-and-unit` job split into `static` and a two-shard `unit` matrix;
+  each unit shard runs `pnpm test:unit --maxWorkers="$JOB_CPUS" --shard=N/2`. The suite took 114 s
+  in one job; two shards should halve it. `unit-isolated` has three files, so a 2-way split leaves
+  no shard empty (Vitest throws when a shard count exceeds a project's file count).
+- **Chromium.** Each e2e shard installs it and does not cache it, about 20 s per job.
+
+## macOS CI: parallel jobs and planned e2e shards (2026-11-02)
+
+macOS ran the static checks, the unit suite and the whole e2e suite in one job: about 11m45s in
+run 41559401003. Its e2e files took 466.6 s there, against 377.7 s on Linux, and
+`swipe-approval.e2e.test.ts` took 78.5 s.
+
+- **Parallel jobs.** `macos.yml` now has a `unit` job, four planned e2e shards, and a `check`
+  aggregate. The static checks are platform-independent and already run once in `ci.yml`, so this
+  workflow no longer repeats them.
+- **Measured on macOS.** `scripts/e2e-durations.json` holds a `linux` and a `darwin` table.
+  `scripts/e2e-shard.ts` reads the table for the platform it runs on. Four macOS shards plan to
+  116.8 s at most, against a 116.7 s mean.
+- **Four macOS shards, not six.** Run 41568408211 started five macOS jobs at once; the sixth and
+  seventh waited about 90 s for a slot. The `unit` job takes one slot, so four e2e shards keep
+  every job running.
+- **Guard test.** `scripts/lib/e2e-shards.test.ts` runs its coverage, determinism, balance, stale
+  entry and collision checks against both tables.
 
 ## keyflap-launch: launchd socket handover (Mac M2, 2026-10-29)
 

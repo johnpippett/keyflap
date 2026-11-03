@@ -2,9 +2,10 @@ name: CI
 
 # GitHub-hosted runners only. The repository is public, and a fork's pull request runs the
 # workflow file it brings, so no self-hosted runner is ever registered to it.
-# The static checks and unit tests run in one job and the e2e suite in four shards, all at once.
-# The `check` job passes only when every other job passed, so a required status check named
-# `check` keeps working.
+# The static checks, two unit shards and six planned e2e shards all run at once. The `check` job
+# passes only when every other job passed, so a required status check named `check` keeps working.
+# The e2e shards are planned by measured duration (scripts/e2e-shard.ts), not split by file count:
+# one file (swipe-approval, about 63 s) is a sixth of the suite, so a count split runs uneven.
 
 on:
   push:
@@ -19,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  static-and-unit:
+  static:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -35,6 +36,28 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:static
+
+  unit:
+    name: unit (shard ${{ matrix.shard }}/2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+      KEYFLAP_TEST_SHARED_WORKERS: ${{ github.event_name == 'pull_request' && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       # nproc ignores a container's cgroup CPU quota.
       - name: Count the CPUs this job may use
         run: |
@@ -45,18 +68,16 @@ jobs:
             if (( quota_cpus < cpus )); then cpus=$quota_cpus; fi
           fi
           echo "JOB_CPUS=$cpus" >> "$GITHUB_ENV"
-      - run: pnpm test:unit --maxWorkers="$JOB_CPUS"
-        env:
-          KEYFLAP_TEST_SHARED_WORKERS: ${{ github.event_name == 'pull_request' && '1' || '' }}
+      - run: pnpm test:unit --maxWorkers="$JOB_CPUS" --shard=${{ matrix.shard }}/2
 
   e2e:
-    name: e2e (shard ${{ matrix.shard }}/4)
+    name: e2e (shard ${{ matrix.shard }}/6)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3, 4, 5, 6]
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
     steps:
@@ -71,11 +92,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium for Playwright (with system libraries)
         run: pnpm --filter @aab/shim exec playwright install --with-deps chromium
-      - run: pnpm test:e2e --shard=${{ matrix.shard }}/4
+      - name: Run the planned e2e shard
+        run: |
+          plan=$(node scripts/e2e-shard.ts ${{ matrix.shard }} 6)
+          if [[ -z "$plan" ]]; then echo "shard ${{ matrix.shard }} planned no files"; exit 1; fi
+          files=()
+          while IFS= read -r file; do files+=("$file"); done <<< "$plan"
+          pnpm exec vitest run --project e2e "${files[@]}"
 
   check:
     if: always()
-    needs: [static-and-unit, e2e]
+    needs: [static, unit, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
