@@ -2878,12 +2878,15 @@ macOS ran the static checks, the unit suite and the whole e2e suite in one job: 
 run 41559401003. Its e2e files took 466.6 s there, against 377.7 s on Linux, and
 `swipe-approval.e2e.test.ts` took 78.5 s.
 
-- **Parallel jobs.** `macos.yml` now has a `unit` job, six planned e2e shards, and a `check`
+- **Parallel jobs.** `macos.yml` now has a `unit` job, four planned e2e shards, and a `check`
   aggregate. The static checks are platform-independent and already run once in `ci.yml`, so this
   workflow no longer repeats them.
 - **Measured on macOS.** `scripts/e2e-durations.json` holds a `linux` and a `darwin` table.
-  `scripts/e2e-shard.ts` reads the table for the platform it runs on. Six macOS shards plan to
-  78.5 s at most, against a 77.8 s mean.
+  `scripts/e2e-shard.ts` reads the table for the platform it runs on. Four macOS shards plan to
+  116.8 s at most, against a 116.7 s mean.
+- **Four macOS shards, not six.** Run 41568408211 started five macOS jobs at once; the sixth and
+  seventh waited about 90 s for a slot. The `unit` job takes one slot, so four e2e shards keep
+  every job running.
 - **Guard test.** `scripts/lib/e2e-shards.test.ts` runs its coverage, determinism, balance, stale
   entry and collision checks against both tables.
 

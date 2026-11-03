@@ -26,11 +26,13 @@ describe('e2e shard plan', () => {
         expect(assignShards(files, durations, 6)).toEqual(assignShards(files, durations, 6));
       });
 
-      it('keeps six shards within 15% of an even load', () => {
-        const shards = assignShards(files, durations, 6);
-        const loads = shards.map((shard) => totalSeconds(shard, durations));
-        const mean = totalSeconds(files, durations) / shards.length;
-        expect(Math.max(...loads)).toBeLessThanOrEqual(mean * 1.15);
+      it('keeps the planned shard counts within 15% of an even load', () => {
+        for (const count of [4, 6]) {
+          const shards = assignShards(files, durations, count);
+          const loads = shards.map((shard) => totalSeconds(shard, durations));
+          const mean = totalSeconds(files, durations) / shards.length;
+          expect(Math.max(...loads)).toBeLessThanOrEqual(mean * 1.15);
+        }
       });
 
       it('has a measured time for every e2e file', () => {

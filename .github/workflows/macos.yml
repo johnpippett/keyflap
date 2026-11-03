@@ -40,13 +40,13 @@ jobs:
       - run: pnpm test:unit --maxWorkers="$(sysctl -n hw.ncpu)"
 
   e2e:
-    name: e2e (shard ${{ matrix.shard }}/6)
+    name: e2e (shard ${{ matrix.shard }}/4)
     runs-on: macos-15
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        shard: [1, 2, 3, 4]
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
     steps:
@@ -64,7 +64,7 @@ jobs:
         run: pnpm --filter @aab/shim exec playwright install chromium
       - name: Run the planned e2e shard
         run: |
-          plan=$(node scripts/e2e-shard.ts ${{ matrix.shard }} 6)
+          plan=$(node scripts/e2e-shard.ts ${{ matrix.shard }} 4)
           if [[ -z "$plan" ]]; then echo "shard ${{ matrix.shard }} planned no files"; exit 1; fi
           files=()
           while IFS= read -r file; do files+=("$file"); done <<< "$plan"

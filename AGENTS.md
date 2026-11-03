@@ -172,7 +172,7 @@ failing check: no `biome-ignore`, `@ts-ignore`, `.skip` or edited expectations t
 If a rule or an invariant test is wrong, stop and ask the owner.
 CI runs only on GitHub-hosted runners, never a self-hosted one (a test pins it). Linux runs the
 static checks once, the unit suite in two shards, and the e2e suite in six planned shards. macOS
-runs the unit suite and the same six e2e shards, planned from its own measured durations. Both
+runs the unit suite and four e2e shards, planned from its own measured durations. Both
 come from `scripts/e2e-durations.json` through `scripts/e2e-shard.ts`. macOS CI runs on every pull
 request, after merging to main, and on demand (`gh workflow run macos.yml --ref BRANCH`).
 The isolation suite needs Linux with rootless podman or docker (~3 min) and is not part of
