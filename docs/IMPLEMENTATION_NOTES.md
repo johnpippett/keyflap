@@ -2870,8 +2870,22 @@ sixth of the suite. A count split cannot fix that; the shard holding the swipe f
   each unit shard runs `pnpm test:unit --maxWorkers="$JOB_CPUS" --shard=N/2`. The suite took 114 s
   in one job; two shards should halve it. `unit-isolated` has three files, so a 2-way split leaves
   no shard empty (Vitest throws when a shard count exceeds a project's file count).
-- **Not changed.** macOS CI still runs unit and e2e unsharded in one job (about 12 minutes) and is
-  not a required check. Chromium is installed per e2e shard, uncached, about 20 s each.
+- **Chromium.** Each e2e shard installs it and does not cache it, about 20 s per job.
+
+## macOS CI: parallel jobs and planned e2e shards (2026-11-02)
+
+macOS ran the static checks, the unit suite and the whole e2e suite in one job: about 11m45s in
+run 41559401003. Its e2e files took 466.6 s there, against 377.7 s on Linux, and
+`swipe-approval.e2e.test.ts` took 78.5 s.
+
+- **Parallel jobs.** `macos.yml` now has a `unit` job, six planned e2e shards, and a `check`
+  aggregate. The static checks are platform-independent and already run once in `ci.yml`, so this
+  workflow no longer repeats them.
+- **Measured on macOS.** `scripts/e2e-durations.json` holds a `linux` and a `darwin` table.
+  `scripts/e2e-shard.ts` reads the table for the platform it runs on. Six macOS shards plan to
+  78.5 s at most, against a 77.8 s mean.
+- **Guard test.** `scripts/lib/e2e-shards.test.ts` runs its coverage, determinism, balance, stale
+  entry and collision checks against both tables.
 
 
 ## keyflap-launch: launchd socket handover (Mac M2, 2026-10-29)

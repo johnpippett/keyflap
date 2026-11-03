@@ -96,7 +96,8 @@ jobs:
         run: |
           plan=$(node scripts/e2e-shard.ts ${{ matrix.shard }} 6)
           if [[ -z "$plan" ]]; then echo "shard ${{ matrix.shard }} planned no files"; exit 1; fi
-          mapfile -t files <<< "$plan"
+          files=()
+          while IFS= read -r file; do files+=("$file"); done <<< "$plan"
           pnpm exec vitest run --project e2e "${files[@]}"
 
   check:

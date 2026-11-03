@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { readDurations, shardFiles } from './lib/e2e-shards.ts';
+import { readPlans, shardFiles } from './lib/e2e-shards.ts';
 
 const [indexArg, countArg] = process.argv.slice(2);
 const index = Number(indexArg);
@@ -9,8 +9,8 @@ if (!Number.isInteger(index) || !Number.isInteger(count)) {
   process.exit(1);
 }
 try {
-  const durations = readDurations(fileURLToPath(new URL('./e2e-durations.json', import.meta.url)));
-  const files = shardFiles(process.cwd(), durations, index, count);
+  const plans = readPlans(fileURLToPath(new URL('./e2e-durations.json', import.meta.url)));
+  const files = shardFiles(process.cwd(), plans, index, count);
   process.stdout.write(`${files.join('\n')}\n`);
 } catch (error) {
   process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);

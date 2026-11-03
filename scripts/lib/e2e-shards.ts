@@ -9,12 +9,24 @@ export type E2eDurations = {
   seconds: Record<string, number>;
 };
 
+export type E2ePlans = {
+  linux: E2eDurations;
+  darwin: E2eDurations;
+};
+
 export function e2eFiles(root: string): string[] {
   return globSync(E2E_GLOB, { cwd: root, exclude: E2E_EXCLUDE }).sort();
 }
 
-export function readDurations(file: string): E2eDurations {
-  return JSON.parse(readFileSync(file, 'utf8')) as E2eDurations;
+export function readPlans(file: string): E2ePlans {
+  return JSON.parse(readFileSync(file, 'utf8')) as E2ePlans;
+}
+
+export function planFor(
+  plans: E2ePlans,
+  platform: NodeJS.Platform = process.platform,
+): E2eDurations {
+  return platform === 'darwin' ? plans.darwin : plans.linux;
 }
 
 function meanOf(seconds: Record<string, number>): number {
@@ -60,14 +72,15 @@ export function assignShards(files: string[], durations: E2eDurations, count: nu
 
 export function shardFiles(
   root: string,
-  durations: E2eDurations,
+  plans: E2ePlans,
   index: number,
   count: number,
+  platform: NodeJS.Platform = process.platform,
 ): string[] {
   if (!Number.isInteger(index) || index < 1 || index > count) {
     throw new Error(`shard index must be 1..${count}, got ${index}`);
   }
-  const shard = assignShards(e2eFiles(root), durations, count)[index - 1];
+  const shard = assignShards(e2eFiles(root), planFor(plans, platform), count)[index - 1];
   if (!shard) throw new Error(`no shard ${index} of ${count}`);
   return shard;
 }

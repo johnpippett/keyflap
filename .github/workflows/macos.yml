@@ -1,11 +1,12 @@
 name: macOS
 
-# Same-user dev mode and the unit + e2e suites on macOS (Apple silicon). A separate
-# workflow so a macOS failure never blocks the Linux CI. Service mode on macOS needs root and
-# a real install, so its installer and isolation tests run on a real Mac
-# (packages/isolation/darwin/run-on-mac.sh), not here. This runs on every pull request, after
-# merging to main, and on demand (Actions tab, or `gh workflow run macos.yml --ref BRANCH`).
-# The repository is public, so GitHub-hosted minutes are free.
+# Same-user dev mode and the suites on macOS (Apple silicon). A separate workflow so a macOS
+# failure never blocks the Linux CI. Service mode on macOS needs root and a real install, so its
+# installer and isolation tests run on a real Mac (packages/isolation/darwin/run-on-mac.sh), not
+# here. This runs on every pull request, after merging to main, and on demand (Actions tab, or
+# `gh workflow run macos.yml --ref BRANCH`). The repository is public, so hosted minutes are free.
+# The static checks are platform-independent and run once in ci.yml, so this workflow omits them.
+# The e2e shards use the macOS durations in scripts/e2e-durations.json, not the Linux ones.
 
 on:
   push:
@@ -21,7 +22,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
+  unit:
     runs-on: macos-15
     timeout-minutes: 30
     env:
@@ -36,9 +37,50 @@ jobs:
           node-version: 22.23.4
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check:static
+      - run: pnpm test:unit --maxWorkers="$(sysctl -n hw.ncpu)"
+
+  e2e:
+    name: e2e (shard ${{ matrix.shard }}/6)
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6]
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       # No --with-deps: that installs Linux system packages; macOS needs none.
       - name: Install Chromium for Playwright
         run: pnpm --filter @aab/shim exec playwright install chromium
-      - run: pnpm test:unit --maxWorkers="$(sysctl -n hw.ncpu)"
-      - run: pnpm test:e2e
+      - name: Run the planned e2e shard
+        run: |
+          plan=$(node scripts/e2e-shard.ts ${{ matrix.shard }} 6)
+          if [[ -z "$plan" ]]; then echo "shard ${{ matrix.shard }} planned no files"; exit 1; fi
+          files=()
+          while IFS= read -r file; do files+=("$file"); done <<< "$plan"
+          pnpm exec vitest run --project e2e "${files[@]}"
+
+  check:
+    if: always()
+    needs: [unit, e2e]
+    runs-on: macos-15
+    timeout-minutes: 10
+    steps:
+      - name: Every other job passed
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Results: $RESULTS"
+          for result in $RESULTS; do
+            if [[ $result != success ]]; then exit 1; fi
+          done

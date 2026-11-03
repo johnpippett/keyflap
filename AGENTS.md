@@ -170,10 +170,11 @@ before pushing. The pre-push hook (`.githooks/pre-push`, opt-in per clone with
 `pnpm hooks:install`) runs the static half, `pnpm check:static`, on every push. Never silence a
 failing check: no `biome-ignore`, `@ts-ignore`, `.skip` or edited expectations to get green.
 If a rule or an invariant test is wrong, stop and ask the owner.
-CI runs only on GitHub-hosted runners, never a self-hosted one (a test pins it); the Linux unit
-suite runs in two shards and the e2e suite in six planned shards (`scripts/e2e-shard.ts`, planned
-by measured duration from `scripts/e2e-durations.json`). macOS CI runs on every pull request,
-after merging to main, and on demand (`gh workflow run macos.yml --ref BRANCH`).
+CI runs only on GitHub-hosted runners, never a self-hosted one (a test pins it). Linux runs the
+static checks once, the unit suite in two shards, and the e2e suite in six planned shards. macOS
+runs the unit suite and the same six e2e shards, planned from its own measured durations. Both
+come from `scripts/e2e-durations.json` through `scripts/e2e-shard.ts`. macOS CI runs on every pull
+request, after merging to main, and on demand (`gh workflow run macos.yml --ref BRANCH`).
 The isolation suite needs Linux with rootless podman or docker (~3 min) and is not part of
 GitHub CI. Its macOS run installs Keyflap for real on a Mac and purges it afterwards:
 `KEYFLAP_MAC=user@host packages/isolation/darwin/run-on-mac.sh` (an admin with `sudo -n`; ~2 min
