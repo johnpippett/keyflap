@@ -1,11 +1,8 @@
 import { globSync, readFileSync } from 'node:fs';
-
-const E2E_GLOB = 'packages/*/test/**/*.e2e.test.ts';
-const E2E_EXCLUDE = ['packages/isolation/**'];
+import { E2E_EXCLUDE, E2E_INCLUDE } from './e2e-files.ts';
 
 export type E2eDurations = {
   source: string;
-  defaultSeconds?: number;
   seconds: Record<string, number>;
 };
 
@@ -15,7 +12,7 @@ export type E2ePlans = {
 };
 
 export function e2eFiles(root: string): string[] {
-  return globSync(E2E_GLOB, { cwd: root, exclude: E2E_EXCLUDE }).sort();
+  return globSync(E2E_INCLUDE, { cwd: root, exclude: E2E_EXCLUDE }).sort();
 }
 
 export function readPlans(file: string): E2ePlans {
@@ -36,7 +33,7 @@ function meanOf(seconds: Record<string, number>): number {
 }
 
 export function secondsOf(file: string, durations: E2eDurations): number {
-  return durations.seconds[file] ?? durations.defaultSeconds ?? meanOf(durations.seconds);
+  return durations.seconds[file] ?? meanOf(durations.seconds);
 }
 
 export function totalSeconds(files: string[], durations: E2eDurations): number {

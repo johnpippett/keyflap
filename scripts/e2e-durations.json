@@ -1,7 +1,6 @@
 {
   "linux": {
     "source": "GitHub Actions run 41559401063 on main, 2026-11-03",
-    "defaultSeconds": 7.41,
     "seconds": {
       "packages/cli/test/agent-hosts.e2e.test.ts": 3.56,
       "packages/cli/test/daemon-cli.e2e.test.ts": 5.29,
@@ -59,7 +58,6 @@
   },
   "darwin": {
     "source": "GitHub Actions run 41559401003 on main, 2026-11-03",
-    "defaultSeconds": 8.97,
     "seconds": {
       "packages/cli/test/agent-hosts.e2e.test.ts": 4.38,
       "packages/cli/test/daemon-cli.e2e.test.ts": 4.32,

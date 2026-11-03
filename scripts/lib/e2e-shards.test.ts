@@ -36,7 +36,8 @@ describe('e2e shard plan', () => {
       });
 
       it('has a measured time for every e2e file', () => {
-        expect(files.filter((file) => durations.seconds[file] === undefined)).toEqual([]);
+        const unmeasured = files.filter((file) => durations.seconds[file] === undefined);
+        expect(unmeasured, 'add the file to scripts/e2e-durations.json').toEqual([]);
       });
 
       it('has no measured file that no longer exists', () => {

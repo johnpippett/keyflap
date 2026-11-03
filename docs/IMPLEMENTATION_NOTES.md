@@ -2858,14 +2858,16 @@ sixth of the suite. A count split cannot fix that; the shard holding the swipe f
 
 - **Planned e2e shards.** `scripts/e2e-shard.ts <index> <count>` prints the files for one shard,
   assigned longest-first from `scripts/e2e-durations.json` (per-file seconds measured from that
-  run; a file with no entry takes the mean). The plan puts six shards within a second of each
-  other (62.8 to 63.3 s) and leaves the swipe file alone in its shard. The workflow matrix runs
-  six shards and passes each one its planned files to `vitest run --project e2e`.
+  run). The plan puts six shards within a second of each other (62.8 to 63.3 s) and leaves the
+  swipe file alone in its shard. The workflow matrix runs six shards and passes each one its
+  planned files to `vitest run --project e2e`. `scripts/lib/e2e-files.ts` holds the e2e include
+  and exclude, and `vitest.config.ts` imports the same constants, so the plan cannot drift from
+  what Vitest runs.
 - **Guard test.** `scripts/lib/e2e-shards.test.ts` checks every e2e file appears exactly once,
   the plan is deterministic and within 15% of an even load, no measured file has been deleted, no
   planned path is a substring of another (positional filters are substring matches), and bad shard
-  counts throw. A new e2e file without a duration is still planned, at the mean; refresh the table
-  when it drifts.
+  counts throw. A new e2e file without a duration fails this test on purpose: add it to
+  `scripts/e2e-durations.json` in the same pull request.
 - **Unit shards.** The old `static-and-unit` job split into `static` and a two-shard `unit` matrix;
   each unit shard runs `pnpm test:unit --maxWorkers="$JOB_CPUS" --shard=N/2`. The suite took 114 s
   in one job; two shards should halve it. `unit-isolated` has three files, so a 2-way split leaves
@@ -2889,7 +2891,6 @@ run 41559401003. Its e2e files took 466.6 s there, against 377.7 s on Linux, and
   every job running.
 - **Guard test.** `scripts/lib/e2e-shards.test.ts` runs its coverage, determinism, balance, stale
   entry and collision checks against both tables.
-
 
 ## keyflap-launch: launchd socket handover (Mac M2, 2026-10-29)
 
