@@ -49,6 +49,7 @@ beforeEach(() => {
   );
   cpSync(BROWSER, join(root, 'browser.sh'));
   chmodSync(join(root, 'browser.sh'), 0o644);
+  fake('uname', 'case $1 in -s) echo Linux ;; -m) echo x86_64 ;; *) exit 2 ;; esac');
   fake(
     'curl',
     `out='' url=''
