@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -267,8 +267,8 @@ describe('service config', () => {
     );
     expect(existsSync(join(dir, 'signer.json'))).toBe(false);
     const sys = '/usr/bin/env';
-    const st = statSync(sys);
-    if (st.uid !== 0 || (st.mode & 0o022) !== 0) return;
+    const st = lstatSync(sys);
+    if (!st.isFile() || st.uid !== 0 || (st.mode & 0o022) !== 0) return;
     installConfig([...args, '--proton-pass-bin', sys]);
     const signer = JSON.parse(readFileSync(join(dir, 'signer.json'), 'utf8'));
     expect(signer.sources.protonPass.bin).toBe(sys);
@@ -314,8 +314,8 @@ describe('service config', () => {
       JSON.parse(readFileSync(join(dir, 'signer.json'), 'utf8')).approverAddress,
     ).toBeUndefined();
     const sys = '/usr/bin/env';
-    const st = statSync(sys);
-    if (st.uid !== 0 || (st.mode & 0o022) !== 0) return;
+    const st = lstatSync(sys);
+    if (!st.isFile() || st.uid !== 0 || (st.mode & 0o022) !== 0) return;
     const dir2 = tmpDir();
     installConfig([
       '--out-dir',
