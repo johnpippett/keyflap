@@ -4204,3 +4204,12 @@ otherwise.
   after the approval promise settles, so a grant recorded by a late approval is still dropped.
   The one existing expectation that pinned the double call (`handoff.test.ts`, "ending while the
   owner decides") now expects one call. Table test: `handoff-states.test.ts`.
+- **SM-6, result mailbox (`Mailbox<T>`, `packages/core/src/mailbox.ts`).** "Finished, unread for
+  a window, then read once or forgotten", written once: `put(value, now)`, `has(now, match)` and
+  `take(now, match)`, where `take` hands a value out at most once and only while
+  `now - putAt <= windowMs`, newest first, and a box keeps at most `capacity` letters (read ones
+  included, oldest out first). Handoff results use one box per agent (capacity 1, 60 s,
+  replacing `lastEnded`'s `claimed`); passkey ceremony results use one per session (capacity 32,
+  `RECENT_CEREMONY_MS`, replacing `Ended.claimed` and `endedAt`). A ceremony a waiter already
+  claimed while it ran (`Inflight.claimed`, unchanged) is put and read at once, so it still takes
+  its slot as before. Both windows are unchanged. Table test: `mailbox.test.ts`.

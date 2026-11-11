@@ -13,6 +13,7 @@ import { SENSITIVE_FIELDS_CSS } from './agent-port.ts';
 import type { AgentIdentity } from './broker.ts';
 import type { HumanCheck } from './challenge.ts';
 import type { Intent } from './intents.ts';
+import { Mailbox } from './mailbox.ts';
 import {
   checkOriginUrl,
   type OriginCheck,
@@ -139,8 +140,6 @@ export function nextHandoffState(
 interface HandoffEnded {
   handoffId: string;
   outcome: HandoffEnd;
-  at: number;
-  claimed: boolean;
 }
 
 interface Handoff {
@@ -210,7 +209,7 @@ export class HandoffManager {
   private readonly open = new Map<string, Handoff>();
   private readonly pushes = new Map<string, number[]>();
   private readonly cooldown = new Map<string, number>();
-  private readonly lastEnded = new Map<string, HandoffEnded>();
+  private readonly lastEnded = new Map<string, Mailbox<HandoffEnded>>();
   private readonly opening = new Map<string, Promise<unknown>>();
   private closed = false;
   private readonly originOf: (page: Page) => OriginCheck;
@@ -271,11 +270,8 @@ export class HandoffManager {
     while (this.opening.has(agentId)) await this.opening.get(agentId)?.catch(() => {});
     let h = this.byAgent(agentId);
     if (!h) {
-      const last = this.lastEnded.get(agentId);
-      if (last && !last.claimed && this.now() - last.at <= UNCLAIMED_MS) {
-        last.claimed = true;
-        return toResult(last.outcome);
-      }
+      const last = this.lastEnded.get(agentId)?.take(this.now());
+      if (last) return toResult(last.outcome);
       const p = this.openFor(session);
       this.opening.set(agentId, p);
       let r: Handoff | HandoffResult;
@@ -291,8 +287,7 @@ export class HandoffManager {
   }
 
   private claim(h: Handoff): void {
-    const last = this.lastEnded.get(h.agentId);
-    if (last?.handoffId === h.id) last.claimed = true;
+    this.lastEnded.get(h.agentId)?.take(this.now(), (e) => e.handoffId === h.id);
   }
 
   private wait(h: Handoff, timeoutMs: number): Promise<HandoffResult> {
@@ -540,7 +535,12 @@ export class HandoffManager {
     h.frame = null;
     h.detail = null;
     this.open.delete(h.id);
-    this.lastEnded.set(h.agentId, { handoffId: h.id, outcome, at: now, claimed: false });
+    let box = this.lastEnded.get(h.agentId);
+    if (!box) {
+      box = new Mailbox<HandoffEnded>({ windowMs: UNCLAIMED_MS });
+      this.lastEnded.set(h.agentId, box);
+    }
+    box.put({ handoffId: h.id, outcome }, now);
     if (outcome === 'cancelled' || outcome === 'expired') this.cooldown.set(h.agentId, now);
     this.audit('handoff.ended', {
       handoffId: h.id,
