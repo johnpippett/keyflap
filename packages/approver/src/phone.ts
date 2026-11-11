@@ -45,6 +45,13 @@ import {
   STATIC,
   securityHeaders,
 } from './page-files.ts';
+import {
+  nextPairingState,
+  type PairingEvent,
+  type PairingState,
+  pairingDevice,
+  pairingStatus,
+} from './pairing-state.ts';
 import { APPROVAL_TTL_MS, buildStatement, requestProblem } from './statement.ts';
 import {
   type ApprovalDecision,
@@ -144,10 +151,7 @@ interface Pending {
 interface Pairing {
   codeHash: Buffer;
   expiresAt: number;
-  challenge: string | null;
-  state: 'open' | 'waiting' | 'paired' | 'failed';
-  token: string | null;
-  kind: DeviceKind | null;
+  state: PairingState;
 }
 
 const COOKIE = '__Host-aab_device';
@@ -419,10 +423,7 @@ export class PhoneApprover implements Approver, HandoffSurface {
     this.pairing = {
       codeHash: Buffer.from(sha256B64url(code)),
       expiresAt: this.now() + (this.opts.pairingTtlMs ?? 10 * 60_000),
-      challenge: null,
-      state: 'open',
-      token: null,
-      kind: null,
+      state: { kind: 'open' },
     };
     const url = `${this.origin}/pair#${code}`;
     writeFileSync(join(this.opts.dir, 'pairing-url'), `${url}\n`, { mode: 0o600 });
@@ -574,6 +575,23 @@ export class PhoneApprover implements Approver, HandoffSurface {
         }
       }),
     );
+  }
+
+  private movePairing(p: Pairing, event: PairingEvent): boolean {
+    const next = nextPairingState(p.state, event);
+    if (next === p.state) return false;
+    p.state = next;
+    return true;
+  }
+
+  private settleVerifying(p: Pairing): void {
+    if (p.state.kind === 'verifying') this.movePairing(p, { kind: 'rejected' });
+  }
+
+  private takePairedToken(p: Pairing): string | null {
+    const s = p.state;
+    if (s.kind !== 'paired' || !this.movePairing(p, { kind: 'token_taken' })) return null;
+    return s.token;
   }
 
   private clearPairing(): void {
@@ -757,9 +775,10 @@ export class PhoneApprover implements Approver, HandoffSurface {
   private async pairOptions(res: ServerResponse, body: Record<string, unknown>): Promise<void> {
     this.requireAddressOk();
     const p = this.checkPairing(body.code);
-    if (p.state !== 'open') throw new HttpError(409, 'pairing_in_progress');
+    if (p.state.kind !== 'open' && p.state.kind !== 'ceremony') {
+      throw new HttpError(409, 'pairing_in_progress');
+    }
     const keys = await this.trustedKeys();
-    p.kind = 'web';
     const options = await generateRegistrationOptions({
       rpName: 'Keyflap approver',
       rpID: this.rpId,
@@ -771,16 +790,31 @@ export class PhoneApprover implements Approver, HandoffSurface {
       supportedAlgorithmIDs: [-7],
       timeout: 120_000,
     });
-    p.challenge = options.challenge;
+    if (!this.movePairing(p, { kind: 'options', challenge: options.challenge })) {
+      throw new HttpError(409, 'pairing_in_progress');
+    }
     this.send(res, 200, options);
   }
 
   private async pairFinish(res: ServerResponse, body: Record<string, unknown>): Promise<void> {
     this.requireAddressOk();
     const p = this.checkPairing(body.code);
-    if (p.state !== 'open' || !p.challenge) throw new HttpError(409, 'no_ceremony');
-    const expectedChallenge = p.challenge;
-    p.challenge = null;
+    if (p.state.kind !== 'ceremony') throw new HttpError(409, 'no_ceremony');
+    const expectedChallenge = p.state.challenge;
+    if (!this.movePairing(p, { kind: 'finish_web' })) throw new HttpError(409, 'no_ceremony');
+    try {
+      await this.finishWeb(res, body, p, expectedChallenge);
+    } finally {
+      this.settleVerifying(p);
+    }
+  }
+
+  private async finishWeb(
+    res: ServerResponse,
+    body: Record<string, unknown>,
+    p: Pairing,
+    expectedChallenge: string,
+  ): Promise<void> {
     let key: { credentialId: string; x: string; y: string; rpId: string; origin: string };
     try {
       const v = await verifyRegistrationResponse({
@@ -831,8 +865,8 @@ export class PhoneApprover implements Approver, HandoffSurface {
       } catch {
         throw new HttpError(409, 'pairing_refused');
       }
-      this.paired(p, key.credentialId, true, 'web');
-      const token = p.token as string;
+      const token = this.paired(p, key.credentialId, true, 'web');
+      this.takePairedToken(p);
       this.clearPairing();
       this.send(res, 200, { status: 'paired' }, { 'set-cookie': this.cookie(token) });
       return;
@@ -856,8 +890,7 @@ export class PhoneApprover implements Approver, HandoffSurface {
       add: (approval: SignedApproval) => Promise<void>;
     },
   ): string {
-    p.state = 'waiting';
-    p.kind = n.kind;
+    this.movePairing(p, { kind: 'needs_approval' });
     const check = checkCode(n.descriptor);
     const what = n.kind === 'native' ? 'iOS app' : 'phone';
     this.opts.log?.(`approver: new ${what} waiting for approval, check code ${check}`);
@@ -893,7 +926,7 @@ export class PhoneApprover implements Approver, HandoffSurface {
         await n.add(d.approval);
         this.paired(p, n.credentialId, false, n.kind);
       } catch {
-        p.state = 'failed';
+        this.movePairing(p, { kind: 'approval_failed' });
         this.opts.onEvent?.('approver.pairing_failed', { origin: this.origin });
       }
     });
@@ -909,29 +942,27 @@ export class PhoneApprover implements Approver, HandoffSurface {
     });
   }
 
-  private paired(p: Pairing, credentialId: string, first: boolean, kind: DeviceKind): void {
+  private paired(p: Pairing, credentialId: string, first: boolean, kind: DeviceKind): string {
     const { device, token } = this.devices.add(credentialId, this.now(), kind);
-    p.state = 'paired';
-    p.token = token;
-    p.kind = kind;
+    this.movePairing(p, { kind: 'paired', token });
     rmSync(join(this.opts.dir, 'pairing-url'), { force: true });
     this.opts.onEvent?.('approver.paired', { credentialId, deviceId: device.id, first, kind });
     const what = kind === 'native' ? 'iOS app key' : 'passkey';
     this.opts.log?.(`approver: paired device ${device.id} (${what} ${credentialId.slice(0, 8)}…)`);
+    return token;
   }
 
   private pairStatus(res: ServerResponse, body: Record<string, unknown>): void {
     const p = this.checkPairing(body.code);
-    if (p.kind === 'native') throw new HttpError(409, 'pairing_in_progress');
-    if (p.state === 'paired' && p.token) {
-      const token = p.token;
-      p.token = null;
+    if (pairingDevice(p.state) === 'native') throw new HttpError(409, 'pairing_in_progress');
+    const token = this.takePairedToken(p);
+    if (token !== null) {
       this.clearPairing();
       this.send(res, 200, { status: 'paired' }, { 'set-cookie': this.cookie(token) });
       return;
     }
-    if (p.state === 'failed') this.clearPairing();
-    this.send(res, 200, { status: p.state === 'paired' ? 'done' : p.state });
+    if (p.state.kind === 'failed') this.clearPairing();
+    this.send(res, 200, { status: pairingStatus(p.state) });
   }
 
   private async pendingFor(req: IncomingMessage, id: unknown): Promise<Pending> {
@@ -1078,9 +1109,7 @@ export class PhoneApprover implements Approver, HandoffSurface {
   private async nativePair(res: ServerResponse, body: Record<string, unknown>): Promise<void> {
     this.requireAddressOk();
     const p = this.checkPairing(body.code);
-    if (p.state !== 'open' || p.challenge !== null) {
-      throw new HttpError(409, 'pairing_in_progress');
-    }
+    if (p.state.kind !== 'open') throw new HttpError(409, 'pairing_in_progress');
     const add = this.opts.signer.addNativeApprover?.bind(this.opts.signer);
     if (!add) throw new HttpError(501, 'native_unsupported');
     const k = body.key as { x?: unknown; y?: unknown } | undefined;
@@ -1107,6 +1136,28 @@ export class PhoneApprover implements Approver, HandoffSurface {
     if (!verifyNativeSignature(key, nativePairingProofBytes(descriptor), proof)) {
       throw new HttpError(400, 'bad_proof');
     }
+    if (!this.movePairing(p, { kind: 'finish_native' })) {
+      throw new HttpError(409, 'pairing_in_progress');
+    }
+    try {
+      await this.finishNative(res, p, { key, keyId, descriptor, proof, add });
+    } finally {
+      this.settleVerifying(p);
+    }
+  }
+
+  private async finishNative(
+    res: ServerResponse,
+    p: Pairing,
+    n: {
+      key: { x: string; y: string; origin: string; userVerification: 'biometry' };
+      keyId: string;
+      descriptor: string;
+      proof: string;
+      add: NonNullable<PhoneApproverOptions['signer']['addNativeApprover']>;
+    },
+  ): Promise<void> {
+    const { key, keyId, descriptor, proof, add } = n;
     const trusted = await this.trustedAll();
     const existing = trusted.passkeys.length + trusted.native.length;
     if (existing === 0 && trusted.anywhere > 0) throw new HttpError(409, 'paired_at_other_origin');
@@ -1117,8 +1168,8 @@ export class PhoneApprover implements Approver, HandoffSurface {
       } catch {
         throw new HttpError(409, 'pairing_refused');
       }
-      this.paired(p, keyId, true, 'native');
-      const token = p.token as string;
+      const token = this.paired(p, keyId, true, 'native');
+      this.takePairedToken(p);
       this.clearPairing();
       this.send(res, 200, { status: 'paired', deviceToken: token, keyId });
       return;
@@ -1134,16 +1185,15 @@ export class PhoneApprover implements Approver, HandoffSurface {
 
   private nativePairStatus(res: ServerResponse, body: Record<string, unknown>): void {
     const p = this.checkPairing(body.code);
-    if (p.kind !== 'native') throw new HttpError(409, 'pairing_in_progress');
-    if (p.state === 'paired' && p.token) {
-      const token = p.token;
-      p.token = null;
+    if (pairingDevice(p.state) !== 'native') throw new HttpError(409, 'pairing_in_progress');
+    const token = this.takePairedToken(p);
+    if (token !== null) {
       this.clearPairing();
       this.send(res, 200, { status: 'paired', deviceToken: token });
       return;
     }
-    if (p.state === 'failed') this.clearPairing();
-    this.send(res, 200, { status: p.state === 'paired' ? 'done' : p.state });
+    if (p.state.kind === 'failed') this.clearPairing();
+    this.send(res, 200, { status: pairingStatus(p.state) });
   }
 
   private async nativePending(

@@ -4213,3 +4213,19 @@ otherwise.
   `RECENT_CEREMONY_MS`, replacing `Ended.claimed` and `endedAt`). A ceremony a waiter already
   claimed while it ran (`Inflight.claimed`, unchanged) is put and read at once, so it still takes
   its slot as before. Both windows are unchanged. Table test: `mailbox.test.ts`.
+- **SM-4, pairing (`PairingState`, `packages/approver/src/pairing-state.ts`).** `open | ceremony
+  {challenge} | verifying {device} | waiting {device} | paired {device, token} | done {device} |
+  failed {device}` replaces the four-value `state` and the nullable `challenge`, `token` and
+  `kind`; `nextPairingState(state, event)` is the only transition. `failed` keeps its device
+  (the issue's sketch had none) because the two status endpoints answer by device kind and
+  must keep answering a failed pairing as before. `pairingStatus` is the one map to the strings
+  the page and the iOS app read (`open`, `waiting`, `paired`, `done`, `failed`; `ceremony` and
+  `verifying` report `open`), unchanged. The deliberate change: `pairFinish` and `nativePair`
+  move the pairing to `verifying` before their first `await`, and back to `open` on any
+  failure. Before, two finishes on one code could both reach the signer (a native pair checked
+  only `open` with no challenge, which a running web finish also was); now the second gets the
+  existing 409 (`no_ceremony` for a web finish, `pairing_in_progress` otherwise), and so does a
+  `pair/options` that arrives while a finish is verifying. While a native pairing is verifying,
+  the web status endpoint answers 409 and the native one `open`, the reverse of before, for the
+  length of one signer call. Both `p.token as string` casts are gone. Table test and the race
+  test: `pairing-states.test.ts`.
