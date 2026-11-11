@@ -4229,3 +4229,13 @@ otherwise.
   the web status endpoint answers 409 and the native one `open`, the reverse of before, for the
   length of one signer call. Both `p.token as string` casts are gone. Table test and the race
   test: `pairing-states.test.ts`.
+- **SM-5, approval card (`CardState`, `packages/approver/src/approval-card.ts`).** `queued |
+  signing {statement} | approved | denied {reason} | timed_out` replaces `statement: … | null`
+  and the `done` flag in `enqueue`'s closure; `nextCardState(state, event)` is the only
+  transition (events `challenge`, `approve`, `deny`, `timeout`), and a finished card ignores
+  every later event, as `done` did. `handoff` stays: it is what the card is, not a step. The
+  owner decision on `signing` was not made, so it is the issue's default **A, latest tap wins**:
+  one statement per card, each `challenge` replaces it, and a decision is checked against the
+  statement as it is when the decision is checked, exactly as before. Pinned by "SM-5 option A"
+  in `native-api.test.ts` (phone A asks, phone B asks, A's signature is refused, B's is
+  accepted). Table test: `approval-card.test.ts`.

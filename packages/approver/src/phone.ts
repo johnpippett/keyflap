@@ -36,6 +36,12 @@ import {
 import { decodeCredentialPublicKey, isoCBOR } from '@simplewebauthn/server/helpers';
 import { ADDRESS_REFUSAL, addressRefusal } from './address-sync.ts';
 import { type ApnsSender, validDeviceToken } from './apns.ts';
+import {
+  type CardEvent,
+  type CardState,
+  nextCardState,
+  signingStatement,
+} from './approval-card.ts';
 import { type Device, type DeviceKind, DeviceStore } from './devices.ts';
 import {
   allowedHostsFor,
@@ -139,7 +145,7 @@ interface Pending {
   expiresAt: number;
   view: View;
   makeStatement: (now: number, o?: { keepSignedIn?: boolean }) => ApprovalStatement;
-  statement: ApprovalStatement | null;
+  state: CardState;
   descriptor?: string;
   finish: (
     d:
@@ -505,20 +511,24 @@ export class PhoneApprover implements Approver, HandoffSurface {
   ): Promise<ApprovalDecision> {
     const descriptor = extra.descriptor;
     return new Promise((resolve) => {
-      let done = false;
       const timeoutMs = this.opts.timeoutMs ?? 120_000;
       const timer = setTimeout(() => finish({ approved: false, reason: 'timeout' }), timeoutMs);
       const onAbort = () => finish({ approved: false, reason: 'aborted' });
       const finish: Pending['finish'] = (d) => {
-        if (done) return;
-        done = true;
+        const event: CardEvent = d.approved
+          ? { kind: 'approve' }
+          : d.reason === 'timeout'
+            ? { kind: 'timeout' }
+            : { kind: 'deny', reason: d.reason };
+        const next = nextCardState(entry.state, event);
+        if (next === entry.state) return;
+        entry.state = next;
         clearTimeout(timer);
         signal?.removeEventListener('abort', onAbort);
         this.pending.delete(id);
         resolve(d);
       };
       if (this.pending.has(id) || signal?.aborted) {
-        done = true;
         clearTimeout(timer);
         resolve({ approved: false, reason: signal?.aborted ? 'aborted' : 'duplicate_request' });
         return;
@@ -532,7 +542,7 @@ export class PhoneApprover implements Approver, HandoffSurface {
         expiresAt: createdAt + timeoutMs,
         view,
         makeStatement,
-        statement: null,
+        state: { kind: 'queued' },
         ...(descriptor !== undefined ? { descriptor } : {}),
         finish,
       };
@@ -994,11 +1004,12 @@ export class PhoneApprover implements Approver, HandoffSurface {
       keys = keys.filter((k) => k.credentialId === d.credentialId);
       if (keys.length === 0) throw new HttpError(403, 'unknown_approver');
     }
-    p.statement = p.makeStatement(this.now(), { keepSignedIn: keep === true });
+    const statement = p.makeStatement(this.now(), { keepSignedIn: keep === true });
+    p.state = nextCardState(p.state, { kind: 'challenge', statement });
     this.send(res, 200, {
-      statement: p.statement,
+      statement,
       descriptor: p.descriptor ?? null,
-      challenge: approvalChallenge(p.statement),
+      challenge: approvalChallenge(statement),
       rpId: this.rpId,
       allowCredentials: keys.map((k) => k.credentialId),
       timeout: 60_000,
@@ -1016,7 +1027,8 @@ export class PhoneApprover implements Approver, HandoffSurface {
       p.finish({ approved: false, reason: 'user_denied' });
       return this.send(res, 200, { ok: true });
     }
-    if (body.decision !== 'approve' || !p.statement) throw new HttpError(400, 'bad_decision');
+    const statement = signingStatement(p.state);
+    if (body.decision !== 'approve' || !statement) throw new HttpError(400, 'bad_decision');
     this.requireAddressOk();
     const c = body.credential as { id?: unknown; response?: Record<string, unknown> } | undefined;
     const r = c?.response;
@@ -1029,7 +1041,7 @@ export class PhoneApprover implements Approver, HandoffSurface {
       throw new HttpError(400, 'bad_credential');
     }
     const approval: WebAuthnApproval = {
-      statement: p.statement,
+      statement,
       approverKeyId: c.id,
       webauthn: {
         authenticatorData: r.authenticatorData,
@@ -1042,7 +1054,9 @@ export class PhoneApprover implements Approver, HandoffSurface {
     if (p.handoff && c.id !== device.credentialId) throw new HttpError(403, 'unknown_approver');
     const check = verifyWebAuthnAssertion(approval, key);
     if (!check.ok) throw new HttpError(400, check.reason);
-    if (this.now() > p.statement.expiresAt) throw new HttpError(400, 'expired');
+    if (this.now() > (signingStatement(p.state) ?? statement).expiresAt) {
+      throw new HttpError(400, 'expired');
+    }
     p.finish(
       p.handoff ? { approved: true, approval, deviceId: device.id } : { approved: true, approval },
     );
@@ -1214,8 +1228,9 @@ export class PhoneApprover implements Approver, HandoffSurface {
   ): Promise<void> {
     const { p } = await this.nativePending(req, body.id);
     this.requireAddressOk();
-    p.statement = p.makeStatement(this.now());
-    this.send(res, 200, { statement: p.statement, descriptor: p.descriptor ?? null });
+    const statement = p.makeStatement(this.now());
+    p.state = nextCardState(p.state, { kind: 'challenge', statement });
+    this.send(res, 200, { statement, descriptor: p.descriptor ?? null });
   }
 
   private async nativeDecide(
@@ -1228,20 +1243,22 @@ export class PhoneApprover implements Approver, HandoffSurface {
       p.finish({ approved: false, reason: 'user_denied' });
       return this.send(res, 200, { ok: true });
     }
-    if (body.decision !== 'approve' || !p.statement || typeof body.signature !== 'string') {
+    const statement = signingStatement(p.state);
+    if (body.decision !== 'approve' || !statement || typeof body.signature !== 'string') {
       throw new HttpError(400, 'bad_decision');
     }
     this.requireAddressOk();
     const key = (await this.trustedAll()).native.find((k) => k.keyId === device.credentialId);
     if (!key) throw new HttpError(403, 'unknown_approver');
+    const signed = signingStatement(p.state) ?? statement;
     const approval: NativeApproval = {
-      statement: p.statement,
+      statement: signed,
       approverKeyId: key.keyId,
       native: { signature: body.signature },
     };
     const check = verifyNativeApproval(approval, key);
     if (!check.ok) throw new HttpError(400, check.reason);
-    if (this.now() > p.statement.expiresAt) throw new HttpError(400, 'expired');
+    if (this.now() > signed.expiresAt) throw new HttpError(400, 'expired');
     p.finish({ approved: true, approval });
     this.send(res, 200, { ok: true });
   }

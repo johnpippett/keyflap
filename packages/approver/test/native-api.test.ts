@@ -469,6 +469,51 @@ describe('native iOS approver API', () => {
     expect(after.native.map((k) => k.keyId)).toEqual([first.keyId]);
   });
 
+  it('SM-5 option A: one statement per card, the latest tap wins', async () => {
+    const first = await pairFirst();
+    const second = app(origin);
+    const code = new URL(approver.startPairing()).hash.slice(1);
+    expect((await post('/api/native/pair', second.pairBody(code))).status).toBe(202);
+    const st = await http('GET', '/api/native/state', { token: first.token });
+    const pairId = (st.json.pending as { id: string }[])[0]?.id as string;
+    const pairCh = await post('/api/native/challenge', { id: pairId }, first.token);
+    const pairS = pairCh.json.statement as ApprovalStatement;
+    await post(
+      '/api/native/decide',
+      { id: pairId, decision: 'approve', signature: first.signStatement(pairS) },
+      first.token,
+    );
+    for (let i = 0; i < 50 && !second.token; i++) {
+      const r = await post('/api/native/pair/status', { code });
+      if (r.json.status === 'paired') second.token = r.json.deviceToken as string;
+      else await new Promise((res) => setTimeout(res, 20));
+    }
+    expect(second.token).not.toBe('');
+
+    const decision = approver.request(req('r-tap'));
+    const chA = await post('/api/native/challenge', { id: 'r-tap' }, first.token);
+    const sA = chA.json.statement as ApprovalStatement;
+    await new Promise((r) => setTimeout(r, 5));
+    const chB = await post('/api/native/challenge', { id: 'r-tap' }, second.token);
+    const sB = chB.json.statement as ApprovalStatement;
+    expect(sB.issuedAt).toBeGreaterThan(sA.issuedAt);
+    const a = await post(
+      '/api/native/decide',
+      { id: 'r-tap', decision: 'approve', signature: first.signStatement(sA) },
+      first.token,
+    );
+    expect(a).toMatchObject({ status: 400, json: { error: 'bad_signature' } });
+    const b = await post(
+      '/api/native/decide',
+      { id: 'r-tap', decision: 'approve', signature: second.signStatement(sB) },
+      second.token,
+    );
+    expect(b).toMatchObject({ status: 200, json: { ok: true } });
+    const d = await decision;
+    expect(d.approved).toBe(true);
+    expect(d.approved && d.approval.statement).toEqual(sB);
+  });
+
   it('registers an APNs token and pushes the request id and site host, nothing else', async () => {
     await approver.close();
     sender?.close();
