@@ -4190,3 +4190,17 @@ otherwise.
   `approverModeRules(mode)` says whether Ed25519 keys count and whether pairing needs an
   approval, and is the only place `server.ts` reads the latch. `phoneLatched` stays readable for
   the admin `status` reply, which reports it as before. Table test: `approver-mode.test.ts`.
+- **SM-1, handoff lifecycle (`HandoffState`, `packages/core/src/handoff.ts`).**
+  `awaiting_approval {abort} | waiting_for_phone | controlled {deviceId} | ended {outcome, at}`
+  replaces `controller`, `ended`, `endedAt`, `claimed` and `abort`; `nextHandoffState(state,
+  event, now)` is the only transition (events `approved`, `start`, `end`), and an event that
+  doesn't fit leaves the state as it is. `withSignIn` stays, read-only: it is a fact about the
+  offer that `view()` and the hook need after the handoff is controlled. "Opening" is still the
+  manager's `opening` map. Two deliberate changes: `lastEnded` keeps only `{handoffId, outcome,
+  at, claimed}`, so an ended handoff no longer holds its Playwright page and session for the
+  life of the daemon; and `signIn.ended` runs exactly once per handoff with a sign-in offer.
+  Before, a handoff that ended while the card waited called it at the end and again when the
+  approval settled; now an end in `awaiting_approval` aborts the card and the hook runs once,
+  after the approval promise settles, so a grant recorded by a late approval is still dropped.
+  The one existing expectation that pinned the double call (`handoff.test.ts`, "ending while the
+  owner decides") now expects one call. Table test: `handoff-states.test.ts`.

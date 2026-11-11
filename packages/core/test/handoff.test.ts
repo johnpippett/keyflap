@@ -652,10 +652,7 @@ describe('HandoffManager', () => {
       expect(f.asked[0]?.signal.aborted).toBe(true);
       f.decide({ ok: true, deviceId: 'dev1' });
       await vi.advanceTimersByTimeAsync(0);
-      expect(f.ended).toEqual([
-        [h.id, 'page_closed'],
-        [h.id, 'page_closed'],
-      ]);
+      expect(f.ended).toEqual([[h.id, 'page_closed']]);
       expect(s.audit.filter((a) => a.event === 'handoff.started')).toEqual([]);
     });
 
