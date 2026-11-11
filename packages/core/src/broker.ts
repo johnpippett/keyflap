@@ -19,6 +19,7 @@ import {
 import type {
   ApprovalStatement,
   FillField,
+  GrantedApproval,
   SignedApproval,
   SignerAuthorization,
 } from '@aab/signer/approval';
@@ -26,7 +27,6 @@ import {
   fillScope,
   HANDOFF_GRANT_MAX_MS,
   handoffSignInClientDataHash,
-  isGrantedApproval,
   sha256B64url,
 } from '@aab/signer/approval';
 import { SignerDenied } from '@aab/signer/client';
@@ -35,7 +35,7 @@ import { isHighRisk, isHighRiskOrigin } from '@aab/signer/risk';
 import { AgentRegistry } from './agents.ts';
 import { AuditLog } from './audit.ts';
 import { CredentialRepo, type PasswordRow, RequestRepo } from './db.ts';
-import { type CoreGrant, GrantBook } from './grants.ts';
+import { type CoreGrant, GrantBook, type WindowGrant } from './grants.ts';
 import { type Intent, IntentStore, intentHash } from './intents.ts';
 import {
   checkOriginUrl,
@@ -123,11 +123,27 @@ export interface LoginEvent {
   host: string;
 }
 
-interface Authorized {
-  approval: SignerAuthorization;
-  used: CoreGrant | null;
-  offered: CoreGrant | null;
+interface ByGrant {
+  by: 'grant';
+  approval: GrantedApproval;
+  grant: CoreGrant;
+}
+
+interface ByApproval {
+  by: 'approval';
+  approval: SignedApproval;
+  offered: WindowGrant | null;
   keep: { agentId: string; site: string } | null;
+}
+
+type Authorized = ByGrant | ByApproval;
+
+interface AuthorizeContext {
+  pol: EffectivePolicy;
+  strong: boolean;
+  allowForMs: number | null;
+  now: number;
+  keepSite: string | null;
 }
 
 const GRANT_USE_TTL_MS = 60_000;
@@ -505,12 +521,11 @@ export class Broker {
     return pol;
   }
 
-  private async authorize(
+  private authorizing(
     agent: AgentIdentity,
     pol: EffectivePolicy,
     r: Omit<ApprovalRequest, 'policy'>,
-    fields: readonly FillField[],
-  ): Promise<Authorized> {
+  ): AuthorizeContext {
     const b = r.binding;
     const strong =
       pol.mode === 'ask-strong' ||
@@ -524,10 +539,31 @@ export class Broker {
       b.credentialId !== null
         ? pol.allowForMs
         : null;
-    const kind = b.kind as CoreGrant['kind'];
-    const credentialId = b.credentialId as string;
     const now = this.now();
     const keepSite = this.keepOffer(agent, r, strong);
+    return { pol, strong, allowForMs, now, keepSite };
+  }
+
+  private async authorize(
+    agent: AgentIdentity,
+    pol: EffectivePolicy,
+    r: Omit<ApprovalRequest, 'policy'>,
+    fields: readonly FillField[],
+  ): Promise<Authorized> {
+    const c = this.authorizing(agent, pol, r);
+    return this.byGrant(agent, r, fields, c) ?? (await this.byApproval(agent, r, fields, c));
+  }
+
+  private byGrant(
+    agent: AgentIdentity,
+    r: Omit<ApprovalRequest, 'policy'>,
+    fields: readonly FillField[],
+    c: AuthorizeContext,
+  ): ByGrant | null {
+    const b = r.binding;
+    const { pol, strong, allowForMs, now } = c;
+    const kind = b.kind as CoreGrant['kind'];
+    const credentialId = b.credentialId as string;
     if (allowForMs !== null) {
       const g = this.grants.find(
         {
@@ -562,10 +598,9 @@ export class Broker {
           verifiedOrigin: r.display.verifiedOrigin,
         });
         return {
+          by: 'grant',
           approval: { statement, grantId: g.grantId, agentId: agent.id },
-          used: g,
-          offered: null,
-          keep: null,
+          grant: g,
         };
       }
     }
@@ -609,13 +644,25 @@ export class Broker {
           ...(g.handoffId ? { handoffId: g.handoffId } : {}),
         });
         return {
+          by: 'grant',
           approval: { statement, grantId: g.grantId, agentId: agent.id },
-          used: g,
-          offered: null,
-          keep: null,
+          grant: g,
         };
       }
     }
+    return null;
+  }
+
+  private async byApproval(
+    agent: AgentIdentity,
+    r: Omit<ApprovalRequest, 'policy'>,
+    fields: readonly FillField[],
+    c: AuthorizeContext,
+  ): Promise<ByApproval> {
+    const b = r.binding;
+    const { strong, allowForMs, keepSite } = c;
+    const kind = b.kind as CoreGrant['kind'];
+    const credentialId = b.credentialId as string;
     const req: ApprovalRequest =
       allowForMs !== null
         ? {
@@ -640,12 +687,12 @@ export class Broker {
     }
     const s = approval.statement;
     if (strong && s.strong !== true) throw new Deny('strong_not_signed');
-    let keep: Authorized['keep'] = null;
+    let keep: ByApproval['keep'] = null;
     if (s.keepSignedIn !== undefined) {
       if (keepSite === null || s.keepSignedIn?.site !== keepSite) throw new Deny('unexpected_keep');
       keep = { agentId: agent.id, site: keepSite };
     }
-    let offered: CoreGrant | null = null;
+    let offered: WindowGrant | null = null;
     if (s.grant !== undefined) {
       const g = s.grant;
       if (
@@ -666,9 +713,10 @@ export class Broker {
         scope: [...fields],
         createdAt: s.issuedAt,
         until: g.until,
+        use: 'window',
       };
     }
-    return { approval, used: null, offered, keep };
+    return { by: 'approval', approval, offered, keep };
   }
 
   private keepOffer(
@@ -706,17 +754,18 @@ export class Broker {
     try {
       result = await op();
     } catch (err) {
-      if (auth.used) {
-        this.grants.drop(auth.used.grantId);
+      if (auth.by === 'grant') {
+        this.grants.drop(auth.grant.grantId);
         this.audit.append('grant.dropped', {
           requestId,
-          grantId: auth.used.grantId,
+          grantId: auth.grant.grantId,
           reason: err instanceof Error ? err.message.slice(0, 64) : 'error',
         });
         throw new Deny('grant_refused');
       }
       throw err;
     }
+    if (auth.by === 'grant') return result;
     const k = auth.keep;
     if (k) {
       auth.keep = null;
@@ -982,9 +1031,9 @@ export class Broker {
         scope: [...f.fields],
         createdAt: s.issuedAt,
         until: g.until,
-        singleUse: true,
+        use: 'single',
         handoffId: handoff.id,
-        armed: false,
+        phase: 'held',
       });
       this.requests.update(requestId, {
         status: 'approved',
@@ -1159,31 +1208,30 @@ export class Broker {
       verifiedOrigin,
     );
     const userHandle = b64url.encode(opts.userId);
-    const auth = await this.authorize(
-      agent,
-      pol,
-      {
-        display: {
-          intentText: intent.text,
-          intentAt: intent.createdAt,
-          verifiedOrigin,
-          agentName: agent.name,
-          credentialType: 'passkey',
-          action: 'register',
-        },
-        binding: {
-          requestId,
-          kind: 'webauthn.create',
-          rpId,
-          credentialId: null,
-          intentHash: intentHash(intent),
-          clientDataHash: sha256B64url(clientDataJSON),
-        },
+    const register: Omit<ApprovalRequest, 'policy'> = {
+      display: {
+        intentText: intent.text,
+        intentAt: intent.createdAt,
+        verifiedOrigin,
+        agentName: agent.name,
+        credentialType: 'passkey',
+        action: 'register',
       },
+      binding: {
+        requestId,
+        kind: 'webauthn.create',
+        rpId,
+        credentialId: null,
+        intentHash: intentHash(intent),
+        clientDataHash: sha256B64url(clientDataJSON),
+      },
+    };
+    const { approval } = await this.byApproval(
+      agent,
+      register,
       [],
+      this.authorizing(agent, pol, register),
     );
-    if (auth.used || isGrantedApproval(auth.approval)) throw new Deny('internal_error');
-    const approval: SignedApproval = auth.approval;
     this.requests.update(requestId, { status: 'approved', intentId: intent.id, now: this.now() });
 
     this.checkAgent(agent);

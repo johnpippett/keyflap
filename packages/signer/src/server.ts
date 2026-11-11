@@ -73,7 +73,7 @@ const FLAG_AT = 0x40;
 
 export class SignerError extends Error {}
 
-interface Grant {
+interface GrantBase {
   grantId: string;
   agentId: string;
   kind: 'webauthn.get' | 'fill';
@@ -82,10 +82,10 @@ interface Grant {
   credentialId: string;
   scope: FillField[];
   until: number;
-  singleUse: boolean;
-  usedBy: string | null;
-  handoffId: string | null;
 }
+
+type Grant = GrantBase &
+  ({ use: 'window' } | { use: 'single'; handoffId: string; spentBy: string | null });
 
 type Check = Extract<ApprovalCheck, { ok: true }> | { ok: true; method: 'grant'; grant: Grant };
 
@@ -599,13 +599,13 @@ export class SignerHandler {
         throw new SignerError('grant_scope_mismatch');
       }
     }
-    if (g.singleUse) {
+    if (g.use === 'single') {
       if (typeof s.requestId !== 'string' || s.requestId.length === 0) {
         throw new SignerError('bad_statement');
       }
-      if (g.usedBy !== null && g.usedBy !== s.requestId) throw new SignerError('grant_used');
-      if (g.usedBy === null) {
-        g.usedBy = s.requestId;
+      if (g.spentBy !== null && g.spentBy !== s.requestId) throw new SignerError('grant_used');
+      if (g.spentBy === null) {
+        g.spentBy = s.requestId;
         this.log('grant_spent', { grantId: g.grantId, requestId: s.requestId });
       }
     }
@@ -718,8 +718,9 @@ export class SignerHandler {
       const oldest = this.grants.keys().next().value as string;
       this.grants.delete(oldest);
     }
-    const single = g.uses === 1 && s.handoff !== undefined;
-    this.grants.set(s.requestId, {
+    const handoff = g.uses === 1 ? s.handoff : undefined;
+    const single = handoff !== undefined;
+    const base: GrantBase = {
       grantId: s.requestId,
       agentId: g.agentId,
       kind: s.kind as Grant['kind'],
@@ -728,10 +729,13 @@ export class SignerHandler {
       credentialId: s.credentialId as string,
       scope: [...scope],
       until: g.until,
-      singleUse: single,
-      usedBy: null,
-      handoffId: single ? (s.handoff?.id ?? null) : null,
-    });
+    };
+    this.grants.set(
+      s.requestId,
+      handoff !== undefined
+        ? { ...base, use: 'single', handoffId: handoff.id, spentBy: null }
+        : { ...base, use: 'window' },
+    );
     this.log('grant_recorded', {
       grantId: s.requestId,
       agentId: g.agentId,

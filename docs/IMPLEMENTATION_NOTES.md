@@ -4239,3 +4239,17 @@ otherwise.
   statement as it is when the decision is checked, exactly as before. Pinned by "SM-5 option A"
   in `native-api.test.ts` (phone A asks, phone B asks, A's signature is refused, B's is
   accepted). Table test: `approval-card.test.ts`.
+- **SM-2, sign-in grant (`CoreGrant` in `packages/core/src/grants.ts`, `Grant` in
+  `packages/signer/src/server.ts`).** Two shapes on both sides: core `GrantBase & ({use:
+  'window'} | {use: 'single'; handoffId; phase: 'held' | 'armed'})`, signer `GrantBase & ({use:
+  'window'} | {use: 'single'; handoffId; spentBy: string | null})`, replacing the optional
+  `singleUse`, `armed` and `handoffId` (core) and `singleUse`, `usedBy` and `handoffId` (signer).
+  `find` returns only a `WindowGrant`, `takeHandoff` only a `SingleUseGrant` in phase `armed`.
+  The broker's `Authorized` is `ByGrant | ByApproval` instead of three nullable fields;
+  `authorize` is `byGrant(…) ?? byApproval(…)`, and registration calls `byApproval` directly,
+  so the `internal_error` guard in `create` is gone: the type rules a grant out. The signer
+  change is internal only: no protocol change, no new request, the same checks in the same
+  order, the same log lines. Whether the signer should also track `held` / `armed` stays the
+  owner's call. `grants.test.ts` had to change how it builds grants, because its helper set the
+  removed fields and a window grant can no longer be `armed`; every assertion is unchanged.
+  Table test: `grant-states.test.ts`.

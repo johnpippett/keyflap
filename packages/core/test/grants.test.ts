@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { type CoreGrant, GrantBook, type GrantQuery } from '../src/grants.ts';
+import { type CoreGrant, type GrantBase, GrantBook, type GrantQuery } from '../src/grants.ts';
 
 const NOW = 1_000_000;
 const WINDOW_MS = 600_000;
@@ -13,7 +13,9 @@ const query: GrantQuery = {
   fields: ['password'],
 };
 
-const grant = (over: Partial<CoreGrant>): CoreGrant => ({
+type Use = { use: 'window' } | { use: 'single'; handoffId: string; phase: 'held' | 'armed' };
+
+const grant = (over: Partial<GrantBase> & Use): CoreGrant => ({
   grantId: 'g1',
   agentId: query.agentId,
   kind: query.kind,
@@ -29,11 +31,11 @@ const grant = (over: Partial<CoreGrant>): CoreGrant => ({
 describe('grant book keeps single-use handoff grants out of allow-for lookups', () => {
   it('find returns an allow-for grant and never a single-use one, armed or not', () => {
     const book = new GrantBook();
-    book.add(grant({ grantId: 'window' }));
+    book.add(grant({ grantId: 'window', use: 'window' }));
     expect(book.find(query, NOW, WINDOW_MS)?.grantId).toBe('window');
 
     const single = new GrantBook();
-    single.add(grant({ grantId: 'once', singleUse: true, handoffId: 'h1' }));
+    single.add(grant({ grantId: 'once', use: 'single', handoffId: 'h1', phase: 'held' }));
     expect(single.find(query, NOW, WINDOW_MS)).toBeNull();
     single.arm('h1');
     expect(single.find(query, NOW, WINDOW_MS)).toBeNull();
@@ -41,15 +43,23 @@ describe('grant book keeps single-use handoff grants out of allow-for lookups', 
 
   it('a single-use grant beside an allow-for grant never wins the lookup, even when it lasts longer', () => {
     const book = new GrantBook();
-    book.add(grant({ grantId: 'window', until: NOW + 1000 }));
-    book.add(grant({ grantId: 'once', singleUse: true, handoffId: 'h1', until: NOW + WINDOW_MS }));
+    book.add(grant({ grantId: 'window', use: 'window', until: NOW + 1000 }));
+    book.add(
+      grant({
+        grantId: 'once',
+        use: 'single',
+        handoffId: 'h1',
+        phase: 'held',
+        until: NOW + WINDOW_MS,
+      }),
+    );
     book.arm('h1');
     expect(book.find(query, NOW, WINDOW_MS)?.grantId).toBe('window');
   });
 
   it('takeHandoff returns an armed single-use grant exactly once, and an unarmed one never', () => {
     const book = new GrantBook();
-    book.add(grant({ grantId: 'once', singleUse: true, handoffId: 'h1' }));
+    book.add(grant({ grantId: 'once', use: 'single', handoffId: 'h1', phase: 'held' }));
     expect(book.takeHandoff(query, NOW)).toBeNull();
     book.arm('h1');
     expect(book.takeHandoff(query, NOW)?.grantId).toBe('once');
@@ -59,7 +69,7 @@ describe('grant book keeps single-use handoff grants out of allow-for lookups', 
 
   it('takeHandoff never returns an allow-for grant', () => {
     const book = new GrantBook();
-    book.add(grant({ grantId: 'window', armed: true }));
+    book.add(grant({ grantId: 'window', use: 'window' }));
     expect(book.takeHandoff(query, NOW)).toBeNull();
     expect(book.size()).toBe(1);
   });
