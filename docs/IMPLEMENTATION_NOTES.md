@@ -4175,3 +4175,18 @@ more than before: an agent running as you can read what the console reads.
   `launchctl` (tests use a fake that records the calls), the glyphs and colours of the warning
   screen in Terminal.app, and that macOS's "Background Items" notification doesn't reappear on the
   restart.
+
+## Explicit state machines (issue 9, 2026-11-11)
+
+Six pieces kept their step as loose flags and nullable fields. Each is now one named state
+value, with its transitions in one place, an exhaustive `switch` on it, and a table test that
+walks every state against every event. All are refactors: wire formats, HTTP responses, audit
+event names and fields and the on-disk key store are unchanged, except where an entry below says
+otherwise.
+
+- **SM-3, approver mode (`ApproverMode`, `packages/signer/src/approver-mode.ts`).**
+  `'unpaired' | 'phone' | 'phone-empty'`, derived by `KeyStore.approverMode()` from the stored
+  `phoneLatched` flag and the approver count; nothing new is written to disk.
+  `approverModeRules(mode)` says whether Ed25519 keys count and whether pairing needs an
+  approval, and is the only place `server.ts` reads the latch. `phoneLatched` stays readable for
+  the admin `status` reply, which reports it as before. Table test: `approver-mode.test.ts`.

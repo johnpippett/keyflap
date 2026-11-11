@@ -42,6 +42,7 @@ import {
   type ApproverAddress,
   ApproverAddressWatch,
 } from './approver-address.ts';
+import { approverModeRules } from './approver-mode.ts';
 import { fromB64url } from './b64url.ts';
 import type { KeyStore } from './keystore.ts';
 import { assertUnixSocketPath } from './platform.ts';
@@ -528,11 +529,11 @@ export class SignerHandler {
     ) {
       throw new SignerError('handoff_approval_not_an_operation');
     }
-    const latched = this.store.phoneLatched || this.store.approverCount > 0;
+    const rules = approverModeRules(this.store.approverMode());
     const sig = verifyApproval(
       approval,
       {
-        ed25519: latched ? {} : this.trusted,
+        ed25519: rules.ed25519Counts ? this.trusted : {},
         webauthn: (id) => this.store.approver(id),
         native: (id) => this.store.nativeApprover(id),
         counterAccepted: (a) => this.isAcceptedFillAssertion(a),
@@ -801,8 +802,9 @@ export class SignerHandler {
     if (this.store.approver(credentialId) || this.store.nativeApprover(credentialId)) {
       throw new SignerError('approver_exists');
     }
-    const first = this.store.approverCount === 0;
-    if (this.store.approverCount > 0 || this.store.phoneLatched) {
+    const mode = this.store.approverMode();
+    const first = mode !== 'phone';
+    if (approverModeRules(mode).pairingNeedsApproval) {
       const approval = req.approval as SignedApproval;
       const sig = this.verify(approval, this.now());
       if (!isUserVerifiedMethod(sig.method)) throw new SignerError('approver_add_needs_phone');
@@ -865,8 +867,9 @@ export class SignerHandler {
     if (this.store.nativeApprover(keyId) || this.store.approver(keyId)) {
       throw new SignerError('approver_exists');
     }
-    const first = this.store.approverCount === 0;
-    if (!first || this.store.phoneLatched) {
+    const mode = this.store.approverMode();
+    const first = mode !== 'phone';
+    if (approverModeRules(mode).pairingNeedsApproval) {
       const approval = req.approval as SignedApproval;
       const sig = this.verify(approval, this.now());
       if (!isUserVerifiedMethod(sig.method)) throw new SignerError('approver_add_needs_phone');
