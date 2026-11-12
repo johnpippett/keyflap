@@ -69,11 +69,11 @@ describe('pairing states: every state against every event', () => {
   for (const k of Object.keys(states) as K[]) {
     for (const e of Object.keys(events) as E[]) {
       const want = moves[k]?.[e];
-      it(`${k} + ${e} -> ${want ? want.kind : 'unchanged'}`, () => {
+      it(`${k} + ${e} -> ${want ? want.kind : 'refused'}`, () => {
         const from = states[k];
         const next = nextPairingState(from, events[e]);
         if (want) expect(next).toEqual(want);
-        else expect(next).toBe(from);
+        else expect(next).toBeNull();
       });
     }
   }

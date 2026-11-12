@@ -222,10 +222,7 @@ export class AgentSession {
     if (!c) return;
     this.inflight.delete(e.id);
     c.resolve(e.ok);
-    const now = this.now();
-    const ended: Ended = { page: c.page, kind: c.kind, ok: e.ok };
-    this.ended.put(ended, now);
-    if (c.claimed) this.ended.take(now, (r) => r === ended);
+    if (!c.claimed) this.ended.put({ page: c.page, kind: c.kind, ok: e.ok }, this.now());
   }
 
   waitForCeremony(kind: CeremonyKind, page: Page, timeoutMs: number): Promise<CeremonyOutcome> {

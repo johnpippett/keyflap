@@ -4191,17 +4191,21 @@ otherwise.
   approval, and is the only place `server.ts` reads the latch. `phoneLatched` stays readable for
   the admin `status` reply, which reports it as before. Table test: `approver-mode.test.ts`.
 - **SM-1, handoff lifecycle (`HandoffState`, `packages/core/src/handoff.ts`).**
-  `awaiting_approval {abort} | waiting_for_phone | controlled {deviceId} | ended {outcome, at}`
-  replaces `controller`, `ended`, `endedAt`, `claimed` and `abort`; `nextHandoffState(state,
-  event, now)` is the only transition (events `approved`, `start`, `end`), and an event that
-  doesn't fit leaves the state as it is. `withSignIn` stays, read-only: it is a fact about the
+  `awaiting_approval {abort, settled} | waiting_for_phone | controlled {deviceId} | ended
+  {outcome}` replaces `controller`, `ended`, `endedAt`, `claimed` and `abort`;
+  `nextHandoffState(state, event)` is the only transition (events `approved`, `start`, `end`),
+  and an event that doesn't fit leaves the state as it is. `withSignIn` stays, read-only: it is a fact about the
   offer that `view()` and the hook need after the handoff is controlled. "Opening" is still the
-  manager's `opening` map. Two deliberate changes: `lastEnded` keeps only `{handoffId, outcome,
-  at, claimed}`, so an ended handoff no longer holds its Playwright page and session for the
-  life of the daemon; and `signIn.ended` runs exactly once per handoff with a sign-in offer.
-  Before, a handoff that ended while the card waited called it at the end and again when the
-  approval settled; now an end in `awaiting_approval` aborts the card and the hook runs once,
-  after the approval promise settles, so a grant recorded by a late approval is still dropped.
+  manager's `opening` map. Two deliberate changes: `lastEnded` is a `Mailbox<{handoffId,
+  outcome}>` per agent (SM-6), so an ended handoff no longer holds its Playwright page and
+  session for the life of the daemon; and `signIn.ended` runs exactly once per handoff with a
+  sign-in offer. Before, a handoff that ended while the card waited called it at the end and
+  again when the approval settled. Now `end()` is the one place that discharges it: from
+  `controlled` or `waiting_for_phone` at once, from `awaiting_approval` it aborts the card and
+  chains the hook onto `settled` (the approval promise, which never rejects; a resolved promise
+  until the approval is asked), so a grant recorded by a late approval, including one from an
+  `approve` that ignores the abort, is still dropped. An `approve` that never settles never
+  fires the hook; it has then recorded no grant through this path either.
   The one existing expectation that pinned the double call (`handoff.test.ts`, "ending while the
   owner decides") now expects one call. Table test: `handoff-states.test.ts`.
 - **SM-6, result mailbox (`Mailbox<T>`, `packages/core/src/mailbox.ts`).** "Finished, unread for
@@ -4211,12 +4215,15 @@ otherwise.
   included, oldest out first). Handoff results use one box per agent (capacity 1, 60 s,
   replacing `lastEnded`'s `claimed`); passkey ceremony results use one per session (capacity 32,
   `RECENT_CEREMONY_MS`, replacing `Ended.claimed` and `endedAt`). A ceremony a waiter already
-  claimed while it ran (`Inflight.claimed`, unchanged) is put and read at once, so it still takes
-  its slot as before. Both windows are unchanged. Table test: `mailbox.test.ts`.
+  claimed while it ran (`Inflight.claimed`: the in-flight half, which the mailbox does not model)
+  is not put at all, so it no longer takes one of the 32 slots; that only changes which unread
+  result is evicted after more than 32 ceremonies in a minute. Both windows are unchanged. Table
+  test: `mailbox.test.ts`.
 - **SM-4, pairing (`PairingState`, `packages/approver/src/pairing-state.ts`).** `open | ceremony
   {challenge} | verifying {device} | waiting {device} | paired {device, token} | done {device} |
   failed {device}` replaces the four-value `state` and the nullable `challenge`, `token` and
-  `kind`; `nextPairingState(state, event)` is the only transition. `failed` keeps its device
+  `kind`; `nextPairingState(state, event)` is the only transition, and returns `null` for an
+  event that doesn't fit, so a refusal is a type, not object identity. `failed` keeps its device
   (the issue's sketch had none) because the two status endpoints answer by device kind and
   must keep answering a failed pairing as before. `pairingStatus` is the one map to the strings
   the page and the iOS app read (`open`, `waiting`, `paired`, `done`, `failed`; `ceremony` and
@@ -4227,23 +4234,29 @@ otherwise.
   existing 409 (`no_ceremony` for a web finish, `pairing_in_progress` otherwise), and so does a
   `pair/options` that arrives while a finish is verifying. While a native pairing is verifying,
   the web status endpoint answers 409 and the native one `open`, the reverse of before, for the
-  length of one signer call. Both `p.token as string` casts are gone. Table test and the race
-  test: `pairing-states.test.ts`.
+  length of one signer call. Both `p.token as string` casts are gone: the token lives only in
+  the `paired` state and is taken from it. Table test and the race test:
+  `pairing-states.test.ts`.
 - **SM-5, approval card (`CardState`, `packages/approver/src/approval-card.ts`).** `queued |
   signing {statement} | approved | denied {reason} | timed_out` replaces `statement: … | null`
   and the `done` flag in `enqueue`'s closure; `nextCardState(state, event)` is the only
-  transition (events `challenge`, `approve`, `deny`, `timeout`), and a finished card ignores
-  every later event, as `done` did. `handoff` stays: it is what the card is, not a step. The
+  transition (events `challenge`, `approve`, `deny`, `timeout`) and returns `null` for an event
+  that doesn't fit, and a finished card ignores every later event, as `done` did. `handoff` stays: it is what the card is, not a step. The
   owner decision on `signing` was not made, so it is the issue's default **A, latest tap wins**:
-  one statement per card, each `challenge` replaces it, and a decision is checked against the
-  statement as it is when the decision is checked, exactly as before. Pinned by "SM-5 option A"
-  in `native-api.test.ts` (phone A asks, phone B asks, A's signature is refused, B's is
-  accepted). Table test: `approval-card.test.ts`.
+  one statement per card, each `challenge` replaces it, and both `decide` and `nativeDecide`
+  read the card's statement after their last `await` and verify the signature and the expiry
+  against that one; a card that finished meanwhile answers 404 `no_such_request`. One change on
+  the web path: before, `decide` verified against the statement it read before awaiting the
+  approver list and checked expiry against the one current afterwards, so a challenge from
+  another phone during that await did not win, and an expired statement could still consume
+  the card. Pinned by "SM-5 option A" in `native-api.test.ts` and by `approval-card-web.test.ts`
+  (both orders, and the challenge landing mid-decision). Table test: `approval-card.test.ts`.
 - **SM-2, sign-in grant (`CoreGrant` in `packages/core/src/grants.ts`, `Grant` in
   `packages/signer/src/server.ts`).** Two shapes on both sides: core `GrantBase & ({use:
   'window'} | {use: 'single'; handoffId; phase: 'held' | 'armed'})`, signer `GrantBase & ({use:
-  'window'} | {use: 'single'; handoffId; spentBy: string | null})`, replacing the optional
-  `singleUse`, `armed` and `handoffId` (core) and `singleUse`, `usedBy` and `handoffId` (signer).
+  'window'} | {use: 'single'; spentBy: string | null})`, replacing the optional `singleUse`,
+  `armed` and `handoffId` (core) and `singleUse`, `usedBy` and `handoffId` (signer; it was never
+  read there, and the `grant_recorded` log line still names the handoff).
   `find` returns only a `WindowGrant`, `takeHandoff` only a `SingleUseGrant` in phase `armed`.
   The broker's `Authorized` is `ByGrant | ByApproval` instead of three nullable fields;
   `authorize` is `byGrant(…) ?? byApproval(…)`, and registration calls `byApproval` directly,

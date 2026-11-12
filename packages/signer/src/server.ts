@@ -84,8 +84,7 @@ interface GrantBase {
   until: number;
 }
 
-type Grant = GrantBase &
-  ({ use: 'window' } | { use: 'single'; handoffId: string; spentBy: string | null });
+type Grant = GrantBase & ({ use: 'window' } | { use: 'single'; spentBy: string | null });
 
 type Check = Extract<ApprovalCheck, { ok: true }> | { ok: true; method: 'grant'; grant: Grant };
 
@@ -718,8 +717,7 @@ export class SignerHandler {
       const oldest = this.grants.keys().next().value as string;
       this.grants.delete(oldest);
     }
-    const handoff = g.uses === 1 ? s.handoff : undefined;
-    const single = handoff !== undefined;
+    const single = g.uses === 1 && s.handoff !== undefined;
     const base: GrantBase = {
       grantId: s.requestId,
       agentId: g.agentId,
@@ -732,9 +730,7 @@ export class SignerHandler {
     };
     this.grants.set(
       s.requestId,
-      handoff !== undefined
-        ? { ...base, use: 'single', handoffId: handoff.id, spentBy: null }
-        : { ...base, use: 'window' },
+      single ? { ...base, use: 'single', spentBy: null } : { ...base, use: 'window' },
     );
     this.log('grant_recorded', {
       grantId: s.requestId,

@@ -96,13 +96,15 @@ class FakeSurface implements HandoffSurface {
 }
 
 class FakeSignIn {
+  eligible = true;
   asked: { id: string; signal: AbortSignal }[] = [];
   ended: [string, HandoffEnd][] = [];
   granted = new Set<string>();
   private answers: ((r: Answer) => void)[] = [];
   hooks(): HandoffSignInHooks<unknown> {
     return {
-      offer: () => ({ ok: true, offer: 'offer' }),
+      offer: () =>
+        this.eligible ? { ok: true, offer: 'offer' } : { ok: false, reason: 'high_risk' },
       approve: (_agent, _offer, h) => {
         this.asked.push(h);
         return new Promise<Answer>((resolve) =>
@@ -171,10 +173,10 @@ const ENDS: HandoffEnd[] = [
 describe('handoff states: every state against every event', () => {
   const abort = new AbortController();
   const states: Record<HandoffState['kind'], HandoffState> = {
-    awaiting_approval: { kind: 'awaiting_approval', abort },
+    awaiting_approval: { kind: 'awaiting_approval', abort, settled: Promise.resolve() },
     waiting_for_phone: { kind: 'waiting_for_phone' },
     controlled: { kind: 'controlled', deviceId: 'dev1' },
-    ended: { kind: 'ended', outcome: 'done', at: 1 },
+    ended: { kind: 'ended', outcome: 'done' },
   };
   const events: Record<string, HandoffEvent> = {
     approved: { kind: 'approved', deviceId: 'dev2' },
@@ -182,7 +184,7 @@ describe('handoff states: every state against every event', () => {
     end: { kind: 'end', outcome: 'cancelled' },
   };
   const controlledBy2: HandoffState = { kind: 'controlled', deviceId: 'dev2' };
-  const endedNow: HandoffState = { kind: 'ended', outcome: 'cancelled', at: 5 };
+  const endedNow: HandoffState = { kind: 'ended', outcome: 'cancelled' };
   const table: [keyof typeof states, keyof typeof events, HandoffState][] = [
     ['awaiting_approval', 'approved', controlledBy2],
     ['awaiting_approval', 'start', states.awaiting_approval],
@@ -206,7 +208,7 @@ describe('handoff states: every state against every event', () => {
 
   for (const [from, event, to] of table) {
     it(`${from} + ${event} -> ${to.kind}`, () => {
-      const next = nextHandoffState(states[from], events[event] as HandoffEvent, 5);
+      const next = nextHandoffState(states[from], events[event] as HandoffEvent);
       expect(next).toEqual(to);
       if (next.kind === from && from !== 'ended' && to === states[from]) {
         expect(next).toBe(states[from]);
@@ -214,9 +216,9 @@ describe('handoff states: every state against every event', () => {
     });
   }
 
-  it('an ended state keeps its first outcome and time', () => {
+  it('an ended state keeps its first outcome', () => {
     for (const outcome of ENDS) {
-      expect(nextHandoffState(states.ended, { kind: 'end', outcome }, 99)).toBe(states.ended);
+      expect(nextHandoffState(states.ended, { kind: 'end', outcome })).toBe(states.ended);
     }
   });
 });
@@ -332,15 +334,39 @@ describe('handoff states: the manager', () => {
     expect(f.granted.size).toBe(0);
   });
 
-  it('a plain handoff never calls signIn.ended', async () => {
-    const s = setup();
+  it('a handoff without a sign-in offer never calls signIn.ended', async () => {
+    for (const how of ENDS) {
+      const f = new FakeSignIn();
+      f.eligible = false;
+      const s = setup({ signIn: f });
+      const page = new FakePage(URL_RP);
+      const h = await s.open(new FakeSession('a', page));
+      expect(s.port().start(h.id, 'dev1')).toBe('ok');
+      expect(s.port().start(h.id, 'dev2')).toBe('taken');
+      await endBy(how, s, page, h.id, 'a');
+      await h.result;
+      await vi.advanceTimersByTimeAsync(0);
+      expect(s.port().start(h.id, 'dev1')).toBe('not_found');
+      expect(f.asked).toEqual([]);
+      expect(f.ended).toEqual([]);
+    }
+  });
+
+  it('an approval that ignores the abort and lands late still has its grant dropped, once', async () => {
+    const f = new FakeSignIn();
+    const s = setup({ signIn: f });
     const page = new FakePage(URL_RP);
     const h = await s.open(new FakeSession('a', page));
-    expect(s.port().start(h.id, 'dev1')).toBe('ok');
-    expect(s.port().start(h.id, 'dev2')).toBe('taken');
-    s.port().finish(h.id, 'dev1', 'done');
-    expect(await h.result).toEqual({ status: 'done' });
-    expect(s.port().start(h.id, 'dev1')).toBe('not_found');
+    s.m.endAgent('a', 'revoked');
+    expect(await h.result).toEqual({ status: 'cancelled' });
+    expect(f.asked[0]?.signal.aborted).toBe(true);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(f.ended).toEqual([]);
+    f.decide({ ok: true, deviceId: 'dev1' });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(f.ended).toEqual([[h.id, 'revoked']]);
+    expect(f.granted.size).toBe(0);
+    expect(s.audit.filter((a) => a.event === 'handoff.started')).toEqual([]);
   });
 
   it('an ended handoff holds no reference to its page or session', async () => {

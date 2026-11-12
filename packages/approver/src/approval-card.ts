@@ -13,7 +13,7 @@ export type CardEvent =
   | { kind: 'deny'; reason: string }
   | { kind: 'timeout' };
 
-export function nextCardState(state: CardState, event: CardEvent): CardState {
+export function nextCardState(state: CardState, event: CardEvent): CardState | null {
   switch (state.kind) {
     case 'queued':
     case 'signing':
@@ -21,7 +21,7 @@ export function nextCardState(state: CardState, event: CardEvent): CardState {
         case 'challenge':
           return { kind: 'signing', statement: event.statement };
         case 'approve':
-          return state.kind === 'signing' ? { kind: 'approved' } : state;
+          return state.kind === 'signing' ? { kind: 'approved' } : null;
         case 'deny':
           return { kind: 'denied', reason: event.reason };
         case 'timeout':
@@ -34,7 +34,7 @@ export function nextCardState(state: CardState, event: CardEvent): CardState {
     case 'approved':
     case 'denied':
     case 'timed_out':
-      return state;
+      return null;
     default: {
       const unhandled: never = state;
       return unhandled;

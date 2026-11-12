@@ -21,35 +21,35 @@ export type PairingEvent =
 
 export type PairingStatus = 'open' | 'waiting' | 'paired' | 'done' | 'failed';
 
-export function nextPairingState(state: PairingState, event: PairingEvent): PairingState {
+export function nextPairingState(state: PairingState, event: PairingEvent): PairingState | null {
   switch (state.kind) {
     case 'open':
       if (event.kind === 'options') return { kind: 'ceremony', challenge: event.challenge };
       if (event.kind === 'finish_native') return { kind: 'verifying', device: 'native' };
-      return state;
+      return null;
     case 'ceremony':
       if (event.kind === 'options') return { kind: 'ceremony', challenge: event.challenge };
       if (event.kind === 'finish_web') return { kind: 'verifying', device: 'web' };
-      return state;
+      return null;
     case 'verifying':
       if (event.kind === 'paired') {
         return { kind: 'paired', device: state.device, token: event.token };
       }
       if (event.kind === 'needs_approval') return { kind: 'waiting', device: state.device };
       if (event.kind === 'rejected') return { kind: 'open' };
-      return state;
+      return null;
     case 'waiting':
       if (event.kind === 'paired') {
         return { kind: 'paired', device: state.device, token: event.token };
       }
       if (event.kind === 'approval_failed') return { kind: 'failed', device: state.device };
-      return state;
+      return null;
     case 'paired':
       if (event.kind === 'token_taken') return { kind: 'done', device: state.device };
-      return state;
+      return null;
     case 'done':
     case 'failed':
-      return state;
+      return null;
     default: {
       const unhandled: never = state;
       return unhandled;

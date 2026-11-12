@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, statSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   buildServiceConfigs,
@@ -26,6 +26,39 @@ import { tmpDir } from './helpers.ts';
 const base = { approverOrigin: 'https://box.tail1.ts.net', tls: false, highRisk: [] };
 const buildLinux = (o: InstallOptions) => buildServiceConfigs(o, LINUX_SERVICE_PATHS, 'linux');
 const parseLinux = (text: string) => parseCoreConfig(text, 'linux');
+
+const SYSTEM_TOOL_CANDIDATES = [
+  '/usr/bin/env',
+  '/usr/bin/bash',
+  '/usr/bin/tar',
+  '/usr/bin/git',
+  '/usr/bin/ssh',
+  '/usr/bin/perl',
+];
+
+function systemTool(): string {
+  const rootOnly = (path: string) => {
+    try {
+      const st = lstatSync(path);
+      return st.uid === 0 && (st.mode & 0o022) === 0 && (st.isFile() || st.isDirectory());
+    } catch {
+      return false;
+    }
+  };
+  const found = SYSTEM_TOOL_CANDIDATES.find(
+    (path) =>
+      lstatSync(path, { throwIfNoEntry: false })?.isFile() === true &&
+      rootOnly(path) &&
+      rootOnly(dirname(path)) &&
+      rootOnly(dirname(dirname(path))),
+  );
+  if (!found) {
+    throw new Error(
+      `no root-owned regular file among ${SYSTEM_TOOL_CANDIDATES.join(', ')} to stand in for a system tool`,
+    );
+  }
+  return found;
+}
 
 describe('service config', () => {
   it('builds the core, signer and approver front configs from installer options', () => {
@@ -266,9 +299,7 @@ describe('service config', () => {
       /not in a system bin directory or \/opt\/keyflap\/tools\/pass-cli\/[\s\S]*fix: install pass-cli as root/,
     );
     expect(existsSync(join(dir, 'signer.json'))).toBe(false);
-    const sys = '/usr/bin/env';
-    const st = lstatSync(sys);
-    if (!st.isFile() || st.uid !== 0 || (st.mode & 0o022) !== 0) return;
+    const sys = systemTool();
     installConfig([...args, '--proton-pass-bin', sys]);
     const signer = JSON.parse(readFileSync(join(dir, 'signer.json'), 'utf8'));
     expect(signer.sources.protonPass.bin).toBe(sys);
@@ -313,9 +344,7 @@ describe('service config', () => {
     expect(
       JSON.parse(readFileSync(join(dir, 'signer.json'), 'utf8')).approverAddress,
     ).toBeUndefined();
-    const sys = '/usr/bin/env';
-    const st = lstatSync(sys);
-    if (!st.isFile() || st.uid !== 0 || (st.mode & 0o022) !== 0) return;
+    const sys = systemTool();
     const dir2 = tmpDir();
     installConfig([
       '--out-dir',
