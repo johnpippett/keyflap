@@ -423,8 +423,10 @@ describe('invariant 10: human handoffs are audited with identifiers and origins 
     await h.tapOnPhone('#note');
     await h.phonePage.fill('#text', TYPED);
     await h.phonePage.click('#text-form button');
-    await h.phonePage.click('.key[data-key="Enter"]');
-    await h.phonePage.click('.scroll[data-dy="400"]');
+    const applied = (path: string) =>
+      h.phonePage.waitForResponse((r) => new URL(r.url()).pathname === path);
+    await Promise.all([applied('/api/handoff/input'), h.phonePage.click('.key[data-key="Enter"]')]);
+    await Promise.all([applied('/api/handoff/input'), h.phonePage.click('.scroll[data-dy="400"]')]);
     await h
       .page()
       .evaluate(() =>

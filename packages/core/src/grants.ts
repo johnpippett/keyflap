@@ -1,6 +1,6 @@
 import type { FillField } from '@aab/signer/approval';
 
-export interface CoreGrant {
+export interface GrantBase {
   grantId: string;
   agentId: string;
   kind: 'webauthn.get' | 'fill';
@@ -10,10 +10,13 @@ export interface CoreGrant {
   scope: FillField[];
   createdAt: number;
   until: number;
-  singleUse?: boolean;
-  handoffId?: string;
-  armed?: boolean;
 }
+
+export type CoreGrant = GrantBase &
+  ({ use: 'window' } | { use: 'single'; handoffId: string; phase: 'held' | 'armed' });
+
+export type WindowGrant = Extract<CoreGrant, { use: 'window' }>;
+export type SingleUseGrant = Extract<CoreGrant, { use: 'single' }>;
 
 export interface GrantQuery {
   agentId: string;
@@ -48,14 +51,14 @@ export class GrantBook {
     this.grants.set(g.grantId, { ...g, scope: [...g.scope] });
   }
 
-  find(q: GrantQuery, now: number, windowMs: number): CoreGrant | null {
-    let best: CoreGrant | null = null;
+  find(q: GrantQuery, now: number, windowMs: number): WindowGrant | null {
+    let best: WindowGrant | null = null;
     for (const [id, g] of this.grants) {
       if (g.until < now) {
         this.grants.delete(id);
         continue;
       }
-      if (g.singleUse || !matches(g, q) || Math.min(g.until, g.createdAt + windowMs) < now) {
+      if (g.use !== 'window' || !matches(g, q) || Math.min(g.until, g.createdAt + windowMs) < now) {
         continue;
       }
       if (!best || g.until > best.until) best = g;
@@ -63,13 +66,13 @@ export class GrantBook {
     return best;
   }
 
-  takeHandoff(q: GrantQuery, now: number): CoreGrant | null {
+  takeHandoff(q: GrantQuery, now: number): SingleUseGrant | null {
     for (const [id, g] of this.grants) {
       if (g.until < now) {
         this.grants.delete(id);
         continue;
       }
-      if (g.singleUse && g.armed === true && matches(g, q)) {
+      if (g.use === 'single' && g.phase === 'armed' && matches(g, q)) {
         this.grants.delete(id);
         return g;
       }
@@ -77,19 +80,19 @@ export class GrantBook {
     return null;
   }
 
-  arm(handoffId: string): CoreGrant | null {
+  arm(handoffId: string): SingleUseGrant | null {
     for (const g of this.grants.values()) {
-      if (g.singleUse && g.handoffId === handoffId) {
-        g.armed = true;
+      if (g.use === 'single' && g.handoffId === handoffId) {
+        g.phase = 'armed';
         return g;
       }
     }
     return null;
   }
 
-  dropHandoff(handoffId: string): CoreGrant | null {
+  dropHandoff(handoffId: string): SingleUseGrant | null {
     for (const [id, g] of this.grants) {
-      if (g.singleUse && g.handoffId === handoffId) {
+      if (g.use === 'single' && g.handoffId === handoffId) {
         this.grants.delete(id);
         return g;
       }

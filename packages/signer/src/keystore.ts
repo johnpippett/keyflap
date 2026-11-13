@@ -10,6 +10,7 @@ import {
 import { existsSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import type { NativeApproverKey, WebAuthnApproverKey } from './approval.ts';
 import type { AddressTrip } from './approver-address.ts';
+import { type ApproverMode, approverModeOf } from './approver-mode.ts';
 import type { TotpParams } from './totp.ts';
 
 export interface StoredCredential {
@@ -190,6 +191,10 @@ export class KeyStore {
 
   get approverCount(): number {
     return this.approvers().length + this.nativeApprovers().length;
+  }
+
+  approverMode(): ApproverMode {
+    return approverModeOf(this.phoneLatched, this.approverCount);
   }
 
   addNativeApprover(key: NativeApproverKey): void {

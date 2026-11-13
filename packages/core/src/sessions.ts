@@ -9,6 +9,7 @@ import {
   siteOfHost,
 } from './browser-state.ts';
 import { ChallengeWatch, detectHumanCheck, type HumanCheck } from './challenge.ts';
+import { Mailbox } from './mailbox.ts';
 
 export const DEFAULT_SAVE_MS = 60_000;
 export const DEFAULT_FULL_SAVE_MS = 10 * 60_000;
@@ -50,8 +51,6 @@ interface Ended {
   page: object | null;
   kind: CeremonyKind;
   ok: boolean;
-  endedAt: number;
-  claimed: boolean;
 }
 interface Waiter {
   page: Page;
@@ -64,7 +63,10 @@ export class AgentSession {
   readonly context: BrowserContext;
   private readonly pages: Page[] = [];
   private readonly inflight = new Map<string, Inflight>();
-  private readonly ended: Ended[] = [];
+  private readonly ended = new Mailbox<Ended>({
+    windowMs: RECENT_CEREMONY_MS,
+    capacity: MAX_RECENT,
+  });
   private readonly waiters = new Set<Waiter>();
   private readonly now: () => number;
   private readonly unsubscribe: () => void;
@@ -194,10 +196,7 @@ export class AgentSession {
 
   hasCeremony(kind: CeremonyKind, page: Page): boolean {
     for (const c of this.inflight.values()) if (c.page === page && c.kind === kind) return true;
-    const cutoff = this.now() - RECENT_CEREMONY_MS;
-    return this.ended.some(
-      (r) => r.page === page && r.kind === kind && !r.claimed && r.endedAt >= cutoff,
-    );
+    return this.ended.has(this.now(), (r) => r.page === page && r.kind === kind);
   }
 
   async newPage(): Promise<Page> {
@@ -223,14 +222,7 @@ export class AgentSession {
     if (!c) return;
     this.inflight.delete(e.id);
     c.resolve(e.ok);
-    this.ended.push({
-      page: c.page,
-      kind: c.kind,
-      ok: e.ok,
-      endedAt: this.now(),
-      claimed: c.claimed,
-    });
-    if (this.ended.length > MAX_RECENT) this.ended.splice(0, this.ended.length - MAX_RECENT);
+    if (!c.claimed) this.ended.put({ page: c.page, kind: c.kind, ok: e.ok }, this.now());
   }
 
   waitForCeremony(kind: CeremonyKind, page: Page, timeoutMs: number): Promise<CeremonyOutcome> {
@@ -238,14 +230,8 @@ export class AgentSession {
     const current = [...this.inflight.values()].filter((c) => c.page === page && c.kind === kind);
     const live = current.at(-1);
     if (!live) {
-      const cutoff = this.now() - RECENT_CEREMONY_MS;
-      for (let i = this.ended.length - 1; i >= 0; i--) {
-        const r = this.ended[i] as Ended;
-        if (r.page === page && r.kind === kind && !r.claimed && r.endedAt >= cutoff) {
-          r.claimed = true;
-          return Promise.resolve(toOutcome(r.ok));
-        }
-      }
+      const r = this.ended.take(this.now(), (x) => x.page === page && x.kind === kind);
+      if (r) return Promise.resolve(toOutcome(r.ok));
     }
     return new Promise<CeremonyOutcome>((resolve) => {
       let settled = false;

@@ -13,6 +13,7 @@ import { SENSITIVE_FIELDS_CSS } from './agent-port.ts';
 import type { AgentIdentity } from './broker.ts';
 import type { HumanCheck } from './challenge.ts';
 import type { Intent } from './intents.ts';
+import { Mailbox } from './mailbox.ts';
 import {
   checkOriginUrl,
   type OriginCheck,
@@ -101,6 +102,44 @@ interface Inputs {
   texts: number;
 }
 
+export type HandoffState =
+  | { kind: 'awaiting_approval'; abort: AbortController; settled: Promise<unknown> }
+  | { kind: 'waiting_for_phone' }
+  | { kind: 'controlled'; deviceId: string }
+  | { kind: 'ended'; outcome: HandoffEnd };
+
+type SignInAnswer = { ok: true; deviceId: string } | { ok: false; reason: string };
+
+export type HandoffEvent =
+  | { kind: 'approved'; deviceId: string }
+  | { kind: 'start'; deviceId: string }
+  | { kind: 'end'; outcome: HandoffEnd };
+
+export function nextHandoffState(state: HandoffState, event: HandoffEvent): HandoffState {
+  switch (state.kind) {
+    case 'ended':
+      return state;
+    case 'awaiting_approval':
+      if (event.kind === 'approved') return { kind: 'controlled', deviceId: event.deviceId };
+      break;
+    case 'waiting_for_phone':
+      if (event.kind === 'start') return { kind: 'controlled', deviceId: event.deviceId };
+      break;
+    case 'controlled':
+      break;
+    default: {
+      const unhandled: never = state;
+      return unhandled;
+    }
+  }
+  return event.kind === 'end' ? { kind: 'ended', outcome: event.outcome } : state;
+}
+
+interface HandoffEnded {
+  handoffId: string;
+  outcome: HandoffEnd;
+}
+
 interface Handoff {
   id: string;
   agentId: string;
@@ -114,9 +153,9 @@ interface Handoff {
   intentAt: number;
   openedAt: number;
   expiresAt: number;
-  controller: string | null;
+  state: HandoffState;
+  readonly withSignIn: boolean;
   inputs: Inputs;
-  ended: HandoffEnd | null;
   done: Promise<HandoffEnd>;
   resolve(e: HandoffEnd): void;
   timer: ReturnType<typeof setTimeout>;
@@ -126,10 +165,6 @@ interface Handoff {
   detail: { at: number; key: string; img: Buffer } | null;
   detailing: { key: string; img: Promise<Buffer | null> } | null;
   queue: Promise<unknown>;
-  claimed: boolean;
-  endedAt: number;
-  withSignIn: boolean;
-  abort: AbortController | null;
 }
 
 const siteOf = (host: string): string => registrableDomain(host) ?? host;
@@ -169,7 +204,7 @@ export class HandoffManager {
   private readonly open = new Map<string, Handoff>();
   private readonly pushes = new Map<string, number[]>();
   private readonly cooldown = new Map<string, number>();
-  private readonly lastEnded = new Map<string, Handoff>();
+  private readonly lastEnded = new Map<string, Mailbox<HandoffEnded>>();
   private readonly opening = new Map<string, Promise<unknown>>();
   private closed = false;
   private readonly originOf: (page: Page) => OriginCheck;
@@ -217,7 +252,6 @@ export class HandoffManager {
       this.opts.audit(event, fields);
       return true;
     } catch {
-      h.controller = null;
       this.end(h, 'cancelled');
       return false;
     }
@@ -231,11 +265,8 @@ export class HandoffManager {
     while (this.opening.has(agentId)) await this.opening.get(agentId)?.catch(() => {});
     let h = this.byAgent(agentId);
     if (!h) {
-      const last = this.lastEnded.get(agentId);
-      if (last?.ended && !last.claimed && this.now() - last.endedAt <= UNCLAIMED_MS) {
-        last.claimed = true;
-        return toResult(last.ended);
-      }
+      const last = this.lastEnded.get(agentId)?.take(this.now());
+      if (last) return toResult(last.outcome);
       const p = this.openFor(session);
       this.opening.set(agentId, p);
       let r: Handoff | HandoffResult;
@@ -250,10 +281,14 @@ export class HandoffManager {
     return this.wait(h, timeoutMs);
   }
 
+  private claim(h: Handoff): void {
+    this.lastEnded.get(h.agentId)?.take(this.now(), (e) => e.handoffId === h.id);
+  }
+
   private wait(h: Handoff, timeoutMs: number): Promise<HandoffResult> {
-    if (h.ended) {
-      h.claimed = true;
-      return Promise.resolve(toResult(h.ended));
+    if (h.state.kind === 'ended') {
+      this.claim(h);
+      return Promise.resolve(toResult(h.state.outcome));
     }
     return new Promise<HandoffResult>((resolve) => {
       let settled = false;
@@ -265,7 +300,7 @@ export class HandoffManager {
         if (settled) return;
         settled = true;
         clearTimeout(t);
-        h.claimed = true;
+        this.claim(h);
         resolve(toResult(e));
       });
     });
@@ -371,44 +406,51 @@ export class HandoffManager {
           : {}),
     });
     if (!logged) return denied;
-    if (signIn.ok) void this.approveSignIn(h, signIn.offer);
-    else void this.surface.notifyHandoff(this.view(h));
+    if (signIn.ok && h.state.kind === 'awaiting_approval') {
+      this.approveSignIn(h, signIn.offer, h.state);
+    } else void this.surface.notifyHandoff(this.view(h));
     return h;
   }
 
-  private async approveSignIn(h: Handoff, offer: unknown): Promise<void> {
-    const hooks = this.opts.signIn;
-    const ctl = new AbortController();
-    h.abort = ctl;
-    let r: { ok: true; deviceId: string } | { ok: false; reason: string };
-    try {
-      r = hooks
-        ? await hooks.approve(h.session.agent, offer, { id: h.id, signal: ctl.signal })
-        : { ok: false, reason: 'unsupported' };
-    } catch {
-      r = { ok: false, reason: 'internal_error' };
-    }
-    h.abort = null;
-    if (h.ended) {
-      this.signInEnded(h, h.ended);
-      return;
-    }
-    if (!r.ok || typeof r.deviceId !== 'string' || r.deviceId.length === 0) {
-      this.end(h, !r.ok && r.reason === 'approval_timeout' ? 'expired' : 'cancelled');
-      return;
-    }
-    h.controller = r.deviceId;
-    this.auditOrEnd(h, 'handoff.started', {
-      handoffId: h.id,
-      deviceId: r.deviceId,
-      via: 'approval',
-    });
+  private approveSignIn(
+    h: Handoff,
+    offer: unknown,
+    waiting: Extract<HandoffState, { kind: 'awaiting_approval' }>,
+  ): void {
+    const asked = this.askSignIn(h, offer, waiting.abort.signal);
+    h.state = { ...waiting, settled: asked };
+    void asked.then((r) => this.signInAnswered(h, r));
   }
 
-  private signInEnded(h: Handoff, outcome: HandoffEnd): void {
-    if (!h.withSignIn) return;
+  private async askSignIn(h: Handoff, offer: unknown, signal: AbortSignal): Promise<SignInAnswer> {
+    const hooks = this.opts.signIn;
     try {
-      this.opts.signIn?.ended(h.id, outcome);
+      return hooks
+        ? await hooks.approve(h.session.agent, offer, { id: h.id, signal })
+        : { ok: false, reason: 'unsupported' };
+    } catch {
+      return { ok: false, reason: 'internal_error' };
+    }
+  }
+
+  private signInAnswered(h: Handoff, r: SignInAnswer): void {
+    if (h.state.kind !== 'awaiting_approval') return;
+    if (r.ok && typeof r.deviceId === 'string' && r.deviceId.length > 0) {
+      h.state = nextHandoffState(h.state, { kind: 'approved', deviceId: r.deviceId });
+      this.auditOrEnd(h, 'handoff.started', {
+        handoffId: h.id,
+        deviceId: r.deviceId,
+        via: 'approval',
+      });
+      return;
+    }
+    this.end(h, !r.ok && r.reason === 'approval_timeout' ? 'expired' : 'cancelled');
+  }
+
+  private signInEnded(h: Handoff): void {
+    if (!h.withSignIn || h.state.kind !== 'ended') return;
+    try {
+      this.opts.signIn?.ended(h.id, h.state.outcome);
     } catch {}
   }
 
@@ -438,9 +480,11 @@ export class HandoffManager {
       intentAt: intent.createdAt,
       openedAt: now,
       expiresAt: now + this.ttlMs,
-      controller: null,
+      state: withSignIn
+        ? { kind: 'awaiting_approval', abort: new AbortController(), settled: Promise.resolve() }
+        : { kind: 'waiting_for_phone' },
+      withSignIn,
       inputs: { clicks: 0, scrolls: 0, drags: 0, keys: 0, texts: 0 },
-      ended: null,
       done,
       resolve,
       timer: setTimeout(() => this.end(h, 'expired'), this.ttlMs),
@@ -450,10 +494,6 @@ export class HandoffManager {
       detailing: null,
       capturing: null,
       queue: Promise.resolve(),
-      claimed: false,
-      endedAt: 0,
-      withSignIn,
-      abort: null,
     };
     h.timer.unref?.();
     const onClose = () => this.end(h, 'page_closed');
@@ -484,16 +524,21 @@ export class HandoffManager {
   }
 
   private end(h: Handoff, outcome: HandoffEnd): void {
-    if (h.ended) return;
-    h.ended = outcome;
+    const was = h.state;
+    if (was.kind === 'ended') return;
+    const now = this.now();
+    h.state = nextHandoffState(was, { kind: 'end', outcome });
     clearTimeout(h.timer);
     h.detach();
     h.frame = null;
     h.detail = null;
     this.open.delete(h.id);
-    const now = this.now();
-    h.endedAt = now;
-    this.lastEnded.set(h.agentId, h);
+    let box = this.lastEnded.get(h.agentId);
+    if (!box) {
+      box = new Mailbox<HandoffEnded>({ windowMs: UNCLAIMED_MS });
+      this.lastEnded.set(h.agentId, box);
+    }
+    box.put({ handoffId: h.id, outcome }, now);
     if (outcome === 'cancelled' || outcome === 'expired') this.cooldown.set(h.agentId, now);
     this.audit('handoff.ended', {
       handoffId: h.id,
@@ -503,8 +548,20 @@ export class HandoffManager {
       durationMs: now - h.openedAt,
       inputs: { ...h.inputs },
     });
-    h.abort?.abort();
-    this.signInEnded(h, outcome);
+    switch (was.kind) {
+      case 'awaiting_approval':
+        was.abort.abort();
+        void was.settled.then(() => this.signInEnded(h));
+        break;
+      case 'waiting_for_phone':
+      case 'controlled':
+        this.signInEnded(h);
+        break;
+      default: {
+        const unhandled: never = was;
+        void unhandled;
+      }
+    }
     if (outcome === 'done' && this.opts.onDone) {
       try {
         void Promise.resolve(
@@ -527,8 +584,8 @@ export class HandoffManager {
 
   private controlled(id: string, deviceId: string): Handoff | HandoffInputResult {
     const h = this.open.get(id);
-    if (!h || h.ended) return { ok: false, reason: 'not_open' };
-    if (h.controller === null || h.controller !== deviceId) {
+    if (!h || h.state.kind === 'ended') return { ok: false, reason: 'not_open' };
+    if (h.state.kind !== 'controlled' || h.state.deviceId !== deviceId) {
       return { ok: false, reason: 'not_controller' };
     }
     if (this.urlSite(h.page) !== h.site) {
@@ -546,7 +603,10 @@ export class HandoffManager {
         const h = this.open.get(id);
         return h ? this.view(h) : null;
       },
-      controller: (id) => this.open.get(id)?.controller ?? null,
+      controller: (id) => {
+        const state = this.open.get(id)?.state;
+        return state?.kind === 'controlled' ? state.deviceId : null;
+      },
       start: (id, deviceId) => this.start(id, deviceId),
       frame: (id, deviceId, clip) =>
         clip ? this.detail(id, deviceId, clip) : this.frame(id, deviceId),
@@ -562,12 +622,25 @@ export class HandoffManager {
 
   private start(id: string, deviceId: string): HandoffStartResult {
     const h = this.open.get(id);
-    if (!h || h.ended) return 'not_found';
-    if (h.controller !== null) return h.controller === deviceId ? 'ok' : 'taken';
-    if (h.withSignIn) return 'approval_only';
-    h.controller = deviceId;
-    if (!this.auditOrEnd(h, 'handoff.started', { handoffId: h.id, deviceId })) return 'not_found';
-    return 'ok';
+    if (!h) return 'not_found';
+    switch (h.state.kind) {
+      case 'ended':
+        return 'not_found';
+      case 'controlled':
+        return h.state.deviceId === deviceId ? 'ok' : 'taken';
+      case 'awaiting_approval':
+        return 'approval_only';
+      case 'waiting_for_phone':
+        h.state = nextHandoffState(h.state, { kind: 'start', deviceId });
+        if (!this.auditOrEnd(h, 'handoff.started', { handoffId: h.id, deviceId })) {
+          return 'not_found';
+        }
+        return 'ok';
+      default: {
+        const unhandled: never = h.state;
+        return unhandled;
+      }
+    }
   }
 
   private async frame(id: string, deviceId: string): Promise<Buffer | null> {
@@ -580,7 +653,7 @@ export class HandoffManager {
         .screenshot({ type: 'jpeg', quality: 60, scale: 'css', timeout: SCREENSHOT_TIMEOUT_MS })
         .then(
           (img) => {
-            if (h.ended || this.pageSite(h.page) !== h.site) return null;
+            if (h.state.kind === 'ended' || this.pageSite(h.page) !== h.site) return null;
             h.frame = { at: this.now(), img };
             return img;
           },
@@ -618,7 +691,7 @@ export class HandoffManager {
       })
       .then(
         (img) => {
-          if (h.ended || this.pageSite(h.page) !== h.site) return null;
+          if (h.state.kind === 'ended' || this.pageSite(h.page) !== h.site) return null;
           h.detail = { at: this.now(), key, img };
           return img;
         },
@@ -640,7 +713,7 @@ export class HandoffManager {
   }
 
   private async apply(h: Handoff, input: HandoffInput): Promise<HandoffInputResult> {
-    if (h.ended) return { ok: false, reason: 'not_open' };
+    if (h.state.kind === 'ended') return { ok: false, reason: 'not_open' };
     const page = h.page;
     try {
       const vp = page.viewportSize();
