@@ -82,16 +82,18 @@ describe('keyflap approver', () => {
   });
 
   it('removes one, after which the signer no longer trusts it', async () => {
-    const r = await runCli(['approver', 'remove', credentialId, '--data-dir', dir], { env });
+    const r = await runCli(['approver', 'remove', '--data-dir', dir, '--', credentialId], { env });
     expect(r.code).toBe(0);
     expect(r.stdout).toContain(`Removed phone approver ${credentialId}`);
     expect(KeyStore.open(signerPaths(dir).storePath, PASSPHRASE).approvers()).toEqual([]);
-    const n = await runCli(['approver', 'remove', nativeId, '--data-dir', dir], { env });
+    const n = await runCli(['approver', 'remove', '--data-dir', dir, '--', nativeId], { env });
     expect(n.code).toBe(0);
     const store = KeyStore.open(signerPaths(dir).storePath, PASSPHRASE);
     expect(store.nativeApprovers()).toEqual([]);
     expect(store.phoneLatched).toBe(false);
-    const again = await runCli(['approver', 'remove', credentialId, '--data-dir', dir], { env });
+    const again = await runCli(['approver', 'remove', '--data-dir', dir, '--', credentialId], {
+      env,
+    });
     expect(again.code).toBe(1);
     expect(again.stderr).toContain('no phone approver with id');
   });

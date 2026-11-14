@@ -212,6 +212,17 @@ describe('console: only commands that print no secret', () => {
     for (const argv of argvs) expect(() => consoleCommand(argv)).not.toThrow();
   });
 
+  it('removes a phone whose id starts with a dash (base64url ids can)', () => {
+    const remove = SECTIONS.flatMap((s) => s.actions).find(
+      (a) => a.kind === 'pick' && a.argv.join(' ') === 'approver list --json',
+    );
+    if (remove?.kind !== 'pick') throw new Error('no phone remove action');
+    const ids = ['-abc', '--data-dir', 'plain'];
+    const json = ids.map((id) => ({ id, type: 'passkey', createdAt: Date.UTC(2026, 0, 1) }));
+    const cmds = remove.choices(json).map((c) => consoleCommand(c.argv));
+    expect(cmds.map((c) => (c.kind === 'approver-remove' ? c.id : null))).toEqual(ids);
+  });
+
   it('without a terminal, keyflap with no command prints its usage as before', async () => {
     const r = await runCli([], { env: { KEYFLAP_MODE: 'service' } });
     expect(r.code).toBe(0);
