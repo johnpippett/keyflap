@@ -219,6 +219,11 @@ describe('keyflap argument parsing', () => {
       kind: 'approver-remove',
       id: 'abc',
     });
+    expect(() => parseCli(['approver', 'remove', '-abc'])).toThrow(UsageError);
+    expect(parseCli(['approver', 'remove', '--', '-abc'])).toMatchObject({
+      kind: 'approver-remove',
+      id: '-abc',
+    });
     expect(() => parseCli(['approver', 'add'])).toThrow(UsageError);
   });
 

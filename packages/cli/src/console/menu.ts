@@ -203,7 +203,7 @@ export const SECTIONS: readonly Section[] = [
       list('See them', PHONES),
       flow('Pair a phone', pairStep),
       pick('Remove one', PHONES, {
-        argv: (p) => ['approver', 'remove', p.id],
+        argv: (p) => ['approver', 'remove', '--', p.id],
         confirm: (p) => `Remove the ${phoneWords(p)}? It can no longer approve.`,
       }),
     ],
