@@ -3,6 +3,16 @@
 Decisions made while implementing ARCHITECTURE.md, especially where the code deviates
 from or tightens the design. Keep this current.
 
+## Standalone pnpm in parallel checks (2026-11-20)
+
+The parallel check runner invokes JavaScript package-manager entry points (`.js`, `.cjs`,
+`.mjs`) under the current Node, but executes standalone binaries and extensionless launchers
+directly. An unset `npm_execpath` still uses pnpm from PATH. This avoids parsing an ELF
+standalone pnpm as JavaScript without switching package managers. Unit tests cover both
+dispatch paths, the empty fallback and spawn errors. Verify with the parallel runner tests
+and `pnpm check:static` launched by standalone pnpm. Reverting affects check invocation
+only; it does not change broker behavior or persisted data.
+
 ## Status
 
 - **M0 done:** monorepo, CI, test RP (passkey register/login, password + TOTP).

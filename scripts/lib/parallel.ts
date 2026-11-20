@@ -5,9 +5,10 @@ export type TaskResult = { name: string; ok: boolean; output: string; seconds: n
 
 export function packageScriptTask(script: string, npmExecPath: string | undefined): Task {
   const args = ['--silent', 'run', script];
-  return npmExecPath
+  if (!npmExecPath) return { name: script, command: 'pnpm', args };
+  return /\.[cm]?js$/.test(npmExecPath)
     ? { name: script, command: process.execPath, args: [npmExecPath, ...args] }
-    : { name: script, command: 'pnpm', args };
+    : { name: script, command: npmExecPath, args };
 }
 
 export function runTask(task: Task): Promise<TaskResult> {
