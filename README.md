@@ -139,7 +139,7 @@ demo/run.sh
 The demo works only with its test website. For the steps, read [demo/README.md](demo/README.md).
 
 **Work on Keyflap.** Contributors run it from a clone, in dev mode. You need pnpm 10 and
-Node.js 22.23.4 or newer (the [requirements](docs/GETTING_STARTED.md#requirements) list the
+Node.js 22.23.5 or newer (the [requirements](docs/GETTING_STARTED.md#requirements) list the
 other Node versions):
 
 ```sh

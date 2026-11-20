@@ -3,6 +3,17 @@
 Decisions made while implementing ARCHITECTURE.md, especially where the code deviates
 from or tightens the design. Keep this current.
 
+## Node 22 security runtime update (2026-11-20)
+
+Node 22 pins, the 22.x engine/doctor/verification floor and the developer version file now
+use 22.23.5. This is the November security release, including CVE-2026-123864 and
+CVE-2026-123872. The 24.x and 26.x floors are unchanged by this update. Runtime tar.xz
+and demo tar.gz hashes come from `https://nodejs.org/dist/v22.23.5/SHASUMS256.txt`.
+CI, installer help, fixtures and current guides follow the new pin; historical measurements
+below retain the version actually measured. Verify hashes against that manifest and run
+unit tests under Node 22.23.5, plus static checks. Reverting the pins and hashes restores
+the older runtime without a data migration, but reintroduces its security exposure.
+
 ## Status
 
 - **M0 done:** monorepo, CI, test RP (passkey register/login, password + TOTP).

@@ -76,7 +76,7 @@ export interface ServiceDoctorContext extends CommonContext {
 export type DoctorContext = DevDoctorContext | ServiceDoctorContext;
 
 export const MIN_NODE: ReadonlyArray<readonly [number, number, number]> = [
-  [22, 23, 4],
+  [22, 23, 5],
   [24, 22, 1],
   [26, 12, 1],
 ];

@@ -67,7 +67,7 @@ function healthyDev(): { sys: FakeSystem; ctx: DevDoctorContext } {
     daemonCommand:
       'keyflap daemon --unprotected --approver phone --approver-origin https://b.tail1.ts.net:8766',
     chromium: async () => ({ ok: true }),
-    nodeVersion: '22.23.4',
+    nodeVersion: '22.23.5',
     local: {
       agents: () => [{ id: AGENT_ID, name: 'claude-code', revoked: false }],
       audit: () => ({ intact: true, entries: 12, brokenAt: null }),
@@ -81,11 +81,20 @@ const status = (r: Awaited<ReturnType<typeof runChecks>>, id: string) =>
   r.checks.find((c) => c.id === id)?.status;
 
 describe('keyflap doctor: Node version', () => {
-  it('accepts only the patched release of each supported line (CVE-2026-111497)', () => {
-    for (const v of ['22.23.4', 'v22.23.4', '22.24.0', '24.22.1', '24.23.0', '26.12.1', '27.0.0']) {
+  it('accepts only the patched release of each supported line', () => {
+    for (const v of ['22.23.5', 'v22.23.5', '22.24.0', '24.22.1', '24.23.0', '26.12.1', '27.0.0']) {
       expect(nodeIsSupported(v), v).toBe(true);
     }
-    for (const v of ['22.23.3', '22.18.0', '20.19.0', '23.11.0', '24.22.0', '25.9.0', '26.12.0']) {
+    for (const v of [
+      '22.23.4',
+      '22.23.3',
+      '22.18.0',
+      '20.19.0',
+      '23.11.0',
+      '24.22.0',
+      '25.9.0',
+      '26.12.0',
+    ]) {
       expect(nodeIsSupported(v), v).toBe(false);
     }
   });
@@ -235,7 +244,7 @@ describe('keyflap doctor (service mode)', () => {
       owner: { uid: 1000, gid: 1000 },
       paths: P,
       chromium: async () => ({ ok: true }),
-      nodeVersion: '22.23.4',
+      nodeVersion: '22.23.5',
       admin: async <T>(socket: string, op: string) => {
         calls.push(`${socket} ${op}`);
         const r: Record<string, unknown> = {
