@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -78,13 +78,25 @@ describe('running checks in parallel', () => {
 });
 
 describe('which pnpm runs each package script', () => {
-  it('the pnpm that started us (npm_execpath), under this Node, when there is one', () => {
-    expect(packageScriptTask('lint', '/corepack/pnpm/10.28.0/bin/pnpm.cjs')).toEqual({
+  it.each(['js', 'cjs', 'mjs'])('runs a pnpm %s entry point under this Node', (ext) => {
+    const entry = `/corepack/pnpm/bin/pnpm.${ext}`;
+    expect(packageScriptTask('lint', entry)).toEqual({
       name: 'lint',
       command: process.execPath,
-      args: ['/corepack/pnpm/10.28.0/bin/pnpm.cjs', '--silent', 'run', 'lint'],
+      args: [entry, '--silent', 'run', 'lint'],
     });
   });
+
+  it.each(['/standalone/pnpm', '/standalone/pnpm.exe'])(
+    'executes the standalone pnpm %s directly',
+    (entry) => {
+      expect(packageScriptTask('lint', entry)).toEqual({
+        name: 'lint',
+        command: entry,
+        args: ['--silent', 'run', 'lint'],
+      });
+    },
+  );
 
   it('pnpm from PATH otherwise', () => {
     for (const unset of [undefined, '']) {
@@ -111,5 +123,32 @@ describe('which pnpm runs each package script', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('run-parallel.ts executes an extensionless executable without parsing it as JavaScript', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'run-parallel-'));
+    try {
+      const fake = join(dir, 'pnpm');
+      writeFileSync(fake, '#!/bin/sh\nprintf \'["%s","%s","%s"]\\n\' "$1" "$2" "$3"\n');
+      chmodSync(fake, 0o700);
+      const out = execFileSync(
+        process.execPath,
+        [join(import.meta.dirname, '..', 'run-parallel.ts'), 'one', 'two'],
+        { env: { ...process.env, npm_execpath: fake, GITHUB_ACTIONS: 'true' }, encoding: 'utf8' },
+      );
+      expect(out).toContain('["--silent","run","one"]');
+      expect(out).toContain('["--silent","run","two"]');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reports a missing standalone executable as a failed task', async () => {
+    const seen: TaskResult[] = [];
+    expect(
+      await runAllInParallel([packageScriptTask('lint', '/nonexistent/pnpm')], (r) => seen.push(r)),
+    ).toBe(false);
+    expect(seen).toMatchObject([{ name: 'lint', ok: false }]);
+    expect(seen[0]?.output).toContain('ENOENT');
   });
 });
