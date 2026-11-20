@@ -3119,6 +3119,14 @@ pass. Every difference from the Linux installer:
   stay allowed (`sfltool dumpbtm`); M4 should probe exactly the list above from a third uid,
   plus `argv` secrecy (`ps -o command=` across uids is readable, spike 4b).
 
+## Isolation container download prerequisites (2026-11-20)
+
+The isolation image includes curl and unzip for the installer's Chrome for Testing
+download during the upgrade scenario. Without them, main fails prerequisite checks
+before the isolation tests run. Verify with a fresh image build and
+`KEYFLAP_ISOLATION_REQUIRED=1 pnpm test:isolation` under Node 22.23.4. Reverting this
+package-list change restores that failure; it does not affect shipped runtime images.
+
 ## Isolation suite on macOS (Mac M4, 2026-10-29)
 
 Unit M4 of `docs/MAC_PLAN.md`: `packages/isolation` runs on a real Mac against the real
