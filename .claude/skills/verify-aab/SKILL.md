@@ -32,7 +32,7 @@ Paths the app reads (checked in source): `--data-dir` (default `~/.keyflap`) hol
 $V/launch.sh
 ```
 
-It takes about 5 seconds. It checks for a patched Node (^22.23.4, ^24.22.1 or >= 26.12.1), makes the sandbox, records a fingerprint of the live broker, registers an agent `verify-agent`, stores a password + TOTP item for `rp.localhost` (the test RP's fixture login `alice`), starts the RP and the daemon, and waits for `Ctrl-C to stop.` in the daemon log. Ready means the MCP port answers and the intent socket exists. It writes the pointer file `~/.local/state/verify/aab/current.env`; the other scripts read it.
+It takes about 5 seconds. It checks for a patched Node (^22.23.5, ^24.22.1 or >= 26.12.1), makes the sandbox, records a fingerprint of the live broker, registers an agent `verify-agent`, stores a password + TOTP item for `rp.localhost` (the test RP's fixture login `alice`), starts the RP and the daemon, and waits for `Ctrl-C to stop.` in the daemon log. Ready means the MCP port answers and the intent socket exists. It writes the pointer file `~/.local/state/verify/aab/current.env`; the other scripts read it.
 
 It refuses to start if a run is already recorded. Run `cleanup.sh` first.
 
@@ -150,7 +150,7 @@ Do not drive these without the user's say-so. They cost money, act on the real d
 - The repo's own suites (`pnpm test:unit`, `pnpm test:e2e`, `pnpm test:isolation`). Run them as CLAUDE.md says before pushing. This skill did not check whether they stay out of your real home or the repo tree (a test runner may write a cache).
 - The security invariants. The skill checks some behavior (prompt content, fail-closed denial, no secret in logs and audit), but the invariant tests are in `packages/*/test/inv*`.
 - allow-for grants, ask-strong, session TTL, high-risk sites, the denylist beyond `--deny`.
-- macOS. Node lines other than the one the launcher found (it requires ^22.23.4, ^24.22.1 or >= 26.12.1).
+- macOS. Node lines other than the one the launcher found (it requires ^22.23.5, ^24.22.1 or >= 26.12.1).
 
 ## If the product needs a change to isolate it
 
