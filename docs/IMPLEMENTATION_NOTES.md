@@ -2322,6 +2322,16 @@ visits arbitrary sites, so a Chromium months behind on security fixes is a real 
   override. (`pnpm update --depth Infinity ip-address` would also have re-resolved unrelated
   dev packages.) `pnpm audit --prod` is clean.
 
+## MCP transport dependency patches (2026-11-20)
+
+The lockfile updates `@hono/node-server` 2.1.3 → 2.1.6 and `hono` 4.13.13 → 4.13.16
+within the existing MCP SDK ranges, without changing the SDK or adding overrides. These
+patch seven audit advisories (GHSA-qv5m-9pm6-hqp3, GHSA-jpvv-r467-5p4w,
+GHSA-4m76-xfj5-7975, GHSA-h7mg-cq63-vhpq, GHSA-46wx-v44x-9hh2,
+GHSA-4h7h-rv7c-7m2v and GHSA-3gg2-335m-rxc6). Verify with `pnpm audit`, the
+unit and e2e suites, and the static checks. Reverting the lockfile restores vulnerable
+versions; no data migration is involved.
+
 ## Security review: origin and policy fixes (2026-10-22)
 
 From the pre-launch review of c8297c3: H1, M3, L2, L3, L4, L8, part of L9, and the Info
