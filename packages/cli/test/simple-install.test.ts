@@ -200,7 +200,7 @@ describe('the "protects less" label', () => {
       simple: SIMPLE,
       daemonCommand: `launchctl kickstart -k gui/1000/${SIMPLE_LABEL}`,
       chromium: async () => ({ ok: true }),
-      nodeVersion: '22.23.4',
+      nodeVersion: '22.23.5',
       local: {
         agents: () => [],
         audit: () => ({ intact: true, entries: 0, brokenAt: null }),

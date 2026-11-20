@@ -32,7 +32,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.4
+          node-version: 22.23.5
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:static
@@ -55,7 +55,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.4
+          node-version: 22.23.5
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # nproc ignores a container's cgroup CPU quota.
@@ -87,7 +87,7 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22.23.4
+          node-version: 22.23.5
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Install Chromium for Playwright (with system libraries)

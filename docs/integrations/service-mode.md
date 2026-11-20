@@ -15,7 +15,7 @@ install on either system is the one command in [setup.md](setup.md#the-one-comma
 
 | | Who (Linux, macOS) | Linux | macOS |
 |---|---|---|---|
-| Code and runtime (Node 22.23.4, Chromium 1248) | root, read-only to everyone | `/opt/keyflap` | `/opt/keyflap` |
+| Code and runtime (Node 22.23.5, Chromium 1248) | root, read-only to everyone | `/opt/keyflap` | `/opt/keyflap` |
 | `keyflap` command | root | `/usr/local/bin/keyflap` | `/usr/local/bin/keyflap` |
 | Core: MCP, intents, audit, managed Chromium, phone approver API | `keyflap-core`, `_keyflap-core` | `/var/lib/keyflap/core` (0700) | `/Library/Keyflap/data/core` (0700) |
 | Approver front: serves the phone's approver page, forwards its API to the core | `keyflap-web`, `_keyflap-web` | no state | `/Library/Keyflap/data/approver` (0700; home and tmp only) |
@@ -77,7 +77,7 @@ setup. These are the same steps by hand.
 You need Linux on x86_64 or aarch64 with systemd ≥ 250 (`systemd-creds`), `xz`, and Xvfb
 (below; or install with `--headless`). The installer checks all of this first and changes
 nothing if something is missing. It downloads one thing: Playwright's Chromium 1248 for
-your architecture (Node 22.23.4 is in the tarball).
+your architecture (Node 22.23.5 is in the tarball).
 
 Set up the phone approver origin first (example: Tailscale; see
 [phone-approver.md](phone-approver.md)):
@@ -147,7 +147,7 @@ What's in a release tarball (`keyflap-<version>-linux-<arch>/`):
 | `runtime-pins.sh` | pinned Node version and SHA-256s, Chromium revision |
 | `units/`, `sysusers.conf`, `tmpfiles.conf`, `keyflap-wrapper.sh` | systemd units and configs, the `keyflap` command |
 | `bundle/app/` | the broker's code: sources, docs and production `node_modules` (no install scripts run) |
-| `node-v22.23.4-linux-<arch>.tar.xz` | the official Node tarball, checked against the pinned SHA-256 at build and at install |
+| `node-v22.23.5-linux-<arch>.tar.xz` | the official Node tarball, checked against the pinned SHA-256 at build and at install |
 | `RELEASE` | version, OS, architecture, commit, Node version, Chromium revision |
 
 ### On a Mac
@@ -186,7 +186,7 @@ The macOS release (`keyflap-<version>-darwin-arm64/`) holds the same `install.sh
 `uninstall.sh`, `runtime-pins.sh`, `bundle/` and `RELEASE`, with `launchd/` (the three
 LaunchDaemon plist templates), `keyflap-launch` (the launchd socket handover program,
 `packages/install/macos/launcher/`) and `keyflap-wrapper.sh` in place of the systemd files, and
-`node-v22.23.4-darwin-arm64.tar.xz`. Design and every measurement: IMPLEMENTATION_NOTES "Service
+`node-v22.23.5-darwin-arm64.tar.xz`. Design and every measurement: IMPLEMENTATION_NOTES "Service
 mode on macOS (S5): the installer".
 
 ### Upgrading
@@ -233,7 +233,7 @@ sudo cp -r /tmp/keyflap-bundle /opt/keyflap-release/bundle
 # 3. Phone approver origin (example: Tailscale)
 tailscale serve --bg --https=8766 http://127.0.0.1:8766
 
-# 4. As root: users, /opt/keyflap (downloads Node 22.23.4, checksum-pinned, and Playwright's
+# 4. As root: users, /opt/keyflap (downloads Node 22.23.5, checksum-pinned, and Playwright's
 #    Chromium 1248), credentials, units; starts the services
 sudo /opt/keyflap-release/installer/install.sh --bundle /opt/keyflap-release/bundle \
   --approver-origin https://broker.tail1234.ts.net:8766

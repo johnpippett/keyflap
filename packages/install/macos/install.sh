@@ -289,7 +289,7 @@ usage: sudo ./install.sh --approver-origin URL [options]        (from a release 
                             (connect or change one without re-installing: sudo keyflap
                             password-source add proton-pass|1password)
   --ephemeral-browser       don't save the agents' browser sessions across restarts
-  --node-tarball FILE       use this node-v22.23.4-darwin-arm64.tar.xz (still checksum-verified;
+  --node-tarball FILE       use this node-v22.23.5-darwin-arm64.tar.xz (still checksum-verified;
                             default: the one in the release tarball, else download it)
   --node-dir DIR            copy this Node 22 install instead (offline/tests; you vouch for it)
   --browsers-dir DIR        copy the browser layout from DIR instead of downloading
