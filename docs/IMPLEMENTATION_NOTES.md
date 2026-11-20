@@ -2856,6 +2856,15 @@ No self-hosted runner is ever registered to this repository, and no workflow nam
 - **Not covered.** A runner registered in the repository's settings is outside the files;
   nothing in the repository can check it.
 
+## CI action runtime update (2026-11-20)
+
+Linux and macOS CI now use the release workflow's SHA-pinned checkout v7.0.1,
+setup-node v7.1.0 and pnpm/action-setup v6.1.0. Each target's `action.yml` declares
+`node24`, replacing the v4 actions' deprecated Node 20 runtime. This does not change the
+Node version selected for package scripts, runner labels, permissions or credentials.
+Verify the target metadata, the workflow runner guard unit tests and static checks;
+actual action execution needs a GitHub run. Revert the action references to roll back.
+
 ## Faster CI, and macOS CI on pull requests (2026-11-01)
 
 The repository is public, so GitHub-hosted runner minutes are free. That removes the reason
