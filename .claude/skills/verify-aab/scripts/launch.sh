@@ -6,7 +6,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 [[ -x $NODE_BIN ]] || die "node not found on PATH"
 # Patched release per Node line (packages/cli/src/doctor.ts MIN_NODE, CVE-2026-111497).
-"$NODE_BIN" -e 'const v=process.versions.node.split(".").map(Number), m={22:[23,4],24:[22,1],26:[12,1]}[v[0]]; process.exit(v[0]>26||(m&&(v[1]>m[0]||(v[1]===m[0]&&v[2]>=m[1])))?0:1)' || die "need node ^22.23.4, ^24.22.1 or >= 26.12.1"
+"$NODE_BIN" -e 'const v=process.versions.node.split(".").map(Number), m={22:[23,5],24:[22,1],26:[12,1]}[v[0]]; process.exit(v[0]>26||(m&&(v[1]>m[0]||(v[1]===m[0]&&v[2]>=m[1])))?0:1)' || die "need node ^22.23.5, ^24.22.1 or >= 26.12.1"
 [[ -d $REPO/node_modules ]] || die "run pnpm install first (the user's call; this skill never installs)"
 [[ -d $PW_BROWSERS ]] || die "Playwright browsers not found at $PW_BROWSERS"
 [[ ! -f $POINTER ]] || die "a run is already recorded in $POINTER. Run scripts/cleanup.sh first."

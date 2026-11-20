@@ -130,7 +130,7 @@ it to the model) and always exits 0.
 
 | File | What it does |
 |---|---|
-| `Containerfile` | Playwright 1.64.1 image (Chromium revision 1248), pinned by digest, plus checksum-pinned Node 22.23.4; `pnpm install --prod`; runs as `pwuser` |
+| `Containerfile` | Playwright 1.64.1 image (Chromium revision 1248), pinned by digest, plus checksum-pinned Node 22.23.5; `pnpm install --prod`; runs as `pwuser` |
 | `entrypoint.sh` | starts the test RP, adds the demo login and agent, prints the token and `.mcp.json`, then runs the daemon in the foreground |
 | `mcp-relay.ts` | relays the published port to the MCP endpoint, which stays bound to the container's loopback |
 | `say.ts` | the `say` command: records your intent through the hook |

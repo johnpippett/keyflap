@@ -182,7 +182,7 @@ usage: sudo ./install.sh --approver-origin URL [options]        (from a release 
                             Xvfb on root's PATH, else /usr/bin/Xvfb; it must be root-only)
   --headless                run the managed browser headless instead of on Xvfb
   --ephemeral-browser       don't save the agents' browser sessions across restarts
-  --node-tarball FILE       use this node-v22.23.4-linux-*.tar.xz (still checksum-verified;
+  --node-tarball FILE       use this node-v22.23.5-linux-*.tar.xz (still checksum-verified;
                             default: the one in the release tarball, else download it)
   --node-dir DIR            copy this Node 22 install instead (offline/tests; you vouch for it)
   --browsers-dir DIR        copy the browser layout from DIR instead of downloading
