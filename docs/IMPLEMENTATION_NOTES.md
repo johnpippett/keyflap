@@ -3,6 +3,15 @@
 Decisions made while implementing ARCHITECTURE.md, especially where the code deviates
 from or tightens the design. Keep this current.
 
+## Package manager security patch (2026-11-20)
+
+The package manager and cloud-session fallback now pin pnpm 10.34.9, the latest 10.x
+release, instead of 10.28.0. This includes the fixes for GHSA-xpqm-wm3m-f34h and
+GHSA-6pfh-p556-v868 (fixed since 10.28.1). Workflows and bundle tooling read the version
+from `package.json`; no lockfile format or dependency changes are needed. Verify with
+`pnpm install --frozen-lockfile`, the static checks and unit tests. Reverting the pins
+would restore a vulnerable installer; no data migration is involved.
+
 ## Status
 
 - **M0 done:** monorepo, CI, test RP (passkey register/login, password + TOTP).
