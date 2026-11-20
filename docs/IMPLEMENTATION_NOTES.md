@@ -3,6 +3,14 @@
 Decisions made while implementing ARCHITECTURE.md, especially where the code deviates
 from or tightens the design. Keep this current.
 
+## Isolation container download prerequisites (2026-11-20)
+
+The isolation image includes curl and unzip for the installer's Chrome for Testing
+download during the upgrade scenario. Without them, main fails prerequisite checks
+before the isolation tests run. Verify with a fresh image build and
+`KEYFLAP_ISOLATION_REQUIRED=1 pnpm test:isolation` under Node 22.23.4. Reverting this
+package-list change restores that failure; it does not affect shipped runtime images.
+
 ## Status
 
 - **M0 done:** monorepo, CI, test RP (passkey register/login, password + TOTP).
