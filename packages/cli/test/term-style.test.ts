@@ -19,7 +19,7 @@ const report: DoctorReport = {
   mode: 'dev',
   ok: false,
   checks: [
-    { id: 'node', status: 'ok', detail: 'Node 22.23.4' },
+    { id: 'node', status: 'ok', detail: 'Node 22.23.5' },
     { id: 'daemon', status: 'fail', detail: 'not running', fix: 'keyflap daemon --unprotected' },
     { id: 'phone', status: 'warn', detail: 'no phone paired', fix: 'keyflap daemon --pair' },
     { id: 'mcp', status: 'skip', detail: 'daemon not running' },

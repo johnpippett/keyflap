@@ -26,7 +26,7 @@ after showing the diff ([setup.md](setup.md)). It authenticates the MCP connecti
 `headersHelper` (`keyflap mcp-headers`) instead of `${KEYFLAP_AGENT_TOKEN}`, so the token is not
 in the model's environment either. `keyflap doctor` checks the result. The manual steps:
 
-Requires a patched Node (22.23.4+ on 22.x; see the README) and this repository (`pnpm install`). The CLI runs from source, so
+Requires a patched Node (22.23.5+ on 22.x; see the README) and this repository (`pnpm install`). The CLI runs from source, so
 put it on your `PATH` with a symlink:
 
 ```sh

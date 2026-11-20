@@ -223,7 +223,7 @@ keyflap --help
 - For phone approval: a phone browser with passkey support (iOS 16+ Safari, Android
   Chrome) and an HTTPS origin with a real hostname. Notifications on an iPhone need iOS 16.4
   or later and the page added to the Home Screen.
-- Dev mode, from a clone: Node.js 22.23.4 or newer on 22.x (24.x: 24.22.1+, 26.x: 26.12.1+;
+- Dev mode, from a clone: Node.js 22.23.5 or newer on 22.x (24.x: 24.22.1+, 26.x: 26.12.1+;
   older releases have CVE-2026-111497), pnpm 10, and Chromium through Playwright (installed by
   the commands above). TypeScript runs directly through Node's type stripping, no build step.
   Dev mode runs on Linux and on a Mac with Apple silicon (tested on a real Mac on 2026-10-29;
