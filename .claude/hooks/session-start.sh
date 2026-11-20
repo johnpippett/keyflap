@@ -10,7 +10,7 @@ fi
 cd "${CLAUDE_PROJECT_DIR:-$(dirname "$0")/../..}"
 
 if ! command -v pnpm >/dev/null 2>&1; then
-  corepack enable >/dev/null 2>&1 || npm install -g pnpm@10.28.0
+  corepack enable >/dev/null 2>&1 || npm install -g pnpm@10.34.9
 fi
 
 pnpm install --prefer-offline
