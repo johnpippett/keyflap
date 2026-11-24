@@ -226,6 +226,7 @@ Want something else? [Open an issue](https://github.com/johnpippett/keyflap/issu
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md): the design, the security rules and the threat model
 - [IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md): decisions and changes to the design
 - [SECURITY.md](SECURITY.md): how to report a vulnerability
+- [Glama MCP directory](https://glama.ai/mcp/servers/johnpippett/keyflap): Keyflap's MCP server listing on Glama
 
 ## Contributing
 
