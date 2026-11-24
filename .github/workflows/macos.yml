@@ -70,7 +70,7 @@ jobs:
           while IFS= read -r file; do files+=("$file"); done <<< "$plan"
           pnpm exec vitest run --project e2e "${files[@]}"
 
-  check:
+  macos-check:
     if: always()
     needs: [unit, e2e]
     runs-on: macos-15
