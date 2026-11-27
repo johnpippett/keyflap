@@ -12,9 +12,11 @@ Public Suffix List snapshot (`2026-10-20_08-40-56_UTC` → `2026-11-26_18-39-01_
   `@modelcontextprotocol/sdk` ranges, picking up the security fixes in 4.13.18
   (GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33, GHSA-74fm-fwc7-3fwp)
   and 4.13.23 (GHSA-656w-x92q-369m, GHSA-586x-c76g-h528, GHSA-mhwf-w6q6-q58w).
-- `tldts` 7.4.16 → 7.4.24 to patch GHSA-mf82-cgp5-3vmq (incorrect PSL wildcard match with
-  `allowPrivateDomains: true`). Held at 7.4.24 because `7.4.26+` treats `kawasaki.jp` as a
-  public suffix, which diverges from `packages/signer/src/psl.ts` (invariant 3 parity test).
+- `tldts` 7.4.16 → 7.6.2 to patch GHSA-mf82-cgp5-3vmq (incorrect PSL wildcard match with
+  `allowPrivateDomains: true`) and match the 2026-11-26 Public Suffix List snapshot in the
+  signer. `packages/signer/src/psl.ts` now also treats the parent of a wildcard rule
+  (`*.p` implies `p`) as a public suffix, matching Chromium, Firefox, libpsl and
+  `tldts >= 7.4.25` (publicsuffix/list#694).
 - `@biomejs/biome` 2.5.15 → 2.6.9 with `markdown.formatter.enabled` and
   `yaml.formatter.enabled` set to `false` in `biome.json`, keeping the prior formatting
   scope and preserving the pasteable indentation of `packages/isolation/ci-job.yml`.
