@@ -3,6 +3,29 @@
 Decisions made while implementing ARCHITECTURE.md, especially where the code deviates
 from or tightens the design. Keep this current.
 
+## Dependency security and routine updates (2026-11-26)
+
+This update refreshes transitive and direct packages, CI action pins and the signer's
+Public Suffix List snapshot (`2026-10-20_08-40-56_UTC` → `2026-11-26_18-39-01_UTC`):
+
+- `hono` 4.13.16 → 4.13.23 and `@hono/node-server` 2.1.6 → 2.1.11 inside the existing
+  `@modelcontextprotocol/sdk` ranges, picking up the security fixes in 4.13.18
+  (GHSA-92p4-j3wq-jmqx, GHSA-39q9-qp46-w8xg, GHSA-h25j-2p75-qj33, GHSA-74fm-fwc7-3fwp)
+  and 4.13.23 (GHSA-656w-x92q-369m, GHSA-586x-c76g-h528, GHSA-mhwf-w6q6-q58w).
+- `tldts` 7.4.16 → 7.4.24 to patch GHSA-mf82-cgp5-3vmq (incorrect PSL wildcard match with
+  `allowPrivateDomains: true`). Held at 7.4.24 because `7.4.26+` treats `kawasaki.jp` as a
+  public suffix, which diverges from `packages/signer/src/psl.ts` (invariant 3 parity test).
+- `@biomejs/biome` 2.5.15 → 2.6.9 with `markdown.formatter.enabled` and
+  `yaml.formatter.enabled` set to `false` in `biome.json`, keeping the prior formatting
+  scope and preserving the pasteable indentation of `packages/isolation/ci-job.yml`.
+- `@modelcontextprotocol/sdk` 1.32.2, `@simplewebauthn/server` 14.1.0, `zod` 4.6.7,
+  `vite` 8.4.0, `vitest` 5.1.2, `@types/node` 22.20.7, and `pnpm/action-setup` v6.1.1
+  (SHA-pinned).
+
+Verify with `pnpm check:static`, `pnpm audit`, `pnpm test:unit` and `pnpm test:e2e` under
+Node 22.23.5. Reverting restores the earlier lockfile and PSL snapshot with no data
+migration.
+
 ## Package manager security patch (2026-11-20)
 
 The package manager and cloud-session fallback now pin pnpm 10.34.9, the latest 10.x
