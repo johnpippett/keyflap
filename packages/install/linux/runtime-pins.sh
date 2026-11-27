@@ -3,26 +3,26 @@
 # the installers check the same values. Plain variables, not an associative array: macOS
 # ships bash 3.2, which has none.
 # Bump NODE_* together (sha256 from https://nodejs.org/dist/vX/SHASUMS256.txt), and
-# CHROMIUM_REVISION together with Playwright (CLAUDE.md: pinned to 1.64.1 / 1248);
+# CHROMIUM_REVISION together with Playwright (CLAUDE.md: pinned to 1.65.1 / 1255);
 # build-bundle.sh refuses a bundle whose Playwright expects another revision.
 # shellcheck shell=bash disable=SC2034
 NODE_VERSION=22.23.5
 NODE_SHA256_linux_x64=cdeb8670a0c81f51b4dc4ac61919f9b1ad917b304bf8221eb939570663d240f8
 NODE_SHA256_linux_arm64=2babb9eb5264860d540849f4b064a6fbdebcdc323657d9d382ce23d313fd5e09
 NODE_SHA256_darwin_arm64=d0c68c321161bb2c6483efea9a343010dea8e5e7f60d73c6a7eba140016d662f
-CHROMIUM_REVISION=1248
-# The Chrome for Testing build put inside Playwright's revision directories: 156.0.8078.80
-# fixes CVE-2026-118306, -118331, -118348 and -118344. Independent of CHROMIUM_REVISION, and
-# it is the security patch level to bump.
-CHROME_FOR_TESTING_VERSION=156.0.8078.80
-CFT_SHA256_linux64_full=b711c720f774be355197f32edf37e0651418ba036d92446ee2da19ac017540a7
-CFT_SHA256_linux64_shell=547dcd374e02961bf998f6046a267644f8502225c36bb78ca307dab32a0b3eb4
-CFT_SHA256_linux_arm64_full=1f496a826c9ba4d6a5f5bf2de686145fe718528c2cc3dbeb96b5893b89653724
-CFT_SHA256_linux_arm64_shell=5bb6a00a4285c13303d3f72c5afdb70f144ea7a93eed462365a52b69631c9607
-CFT_SHA256_mac_arm64_full=8bc590d1b1acac042a000234c768f31830f25a3983a83ed5e067114c87c4cad1
-CFT_SHA256_mac_arm64_shell=ea615baa2e9caf0d02d1898a6562b5f8fa9c35239707dae0f592178df5b986ac
-CFT_SHA256_mac_x64_full=672b79dc79fdf28bb2ec9787b7fa33810c2b3cfd946a0fb4d3b72775f4e6fd9a
-CFT_SHA256_mac_x64_shell=535d417d9034cbd11e7dacd1a71aa3d6e1b525e6d5dcd2671eb2532f01481228
+CHROMIUM_REVISION=1255
+# The Chrome for Testing build put inside Playwright's revision directories: 159.0.8154.33
+# updates the 159.0.8154 branch ahead of Playwright 1.65.1's bundled 159.0.8154.6. Independent
+# of CHROMIUM_REVISION, and it is the security patch level to bump.
+CHROME_FOR_TESTING_VERSION=159.0.8154.33
+CFT_SHA256_linux64_full=892ea184f6738de789b1e3fc18f66ac8d7a1f55b473f688cb27fe0b1b55f409e
+CFT_SHA256_linux64_shell=50664258def7bad1793d527b30c900540b668462686e3cc5862e65036652a190
+CFT_SHA256_linux_arm64_full=84e7ec54c9e3d7d03435fda89a2e71cef7e5117b2abd5e2fafa8d7f3521963b7
+CFT_SHA256_linux_arm64_shell=6f08e46a33caa8940b6ac77c082d187b6e4cbf099997eea28dbed75dd1050432
+CFT_SHA256_mac_arm64_full=00b33fd0c8dc9b5ef33301763df177a566424cce328be303c1736581c4a09ffe
+CFT_SHA256_mac_arm64_shell=f3e5fa5eb5c4803024fd3e198175cddd6cbd40dfd9e2aef75c2d3bf924010457
+CFT_SHA256_mac_x64_full=e8f2f419e9dbff7599def39acedffd5ef6897891c834f874c28fe436344f43f3
+CFT_SHA256_mac_x64_shell=d251b6d9e535c6cf5413ec948e1ef55156f4473956f9f452ff4cad3ba1474c97
 
 # node_sha256 OS ARCH: the pinned SHA-256 of node-vNODE_VERSION-OS-ARCH.tar.xz, or nothing.
 node_sha256() {

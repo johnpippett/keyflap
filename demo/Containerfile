@@ -4,10 +4,10 @@
 #   podman build -f demo/Containerfile --ignorefile demo/Containerfile.dockerignore -t keyflap-demo .
 #   docker build -f demo/Containerfile -t keyflap-demo .      (docker reads the .dockerignore itself)
 #
-# Base: the Playwright image for the pinned Playwright 1.64.1 (Chromium revision 1248, see
+# Base: the Playwright image for the pinned Playwright 1.65.1 (Chromium revision 1255, see
 # packages/shim/package.json), Ubuntu 24.04. Pinned by the multi-arch index digest
 # (linux/amd64 + linux/arm64). Bump it together with Playwright.
-FROM mcr.microsoft.com/playwright:v1.64.1-noble@sha256:7852dc5a7d72f5fe458a597d690f6c42fbc8e9e26ddfa95f8e6ef552558d9bbf
+FROM mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
 
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \

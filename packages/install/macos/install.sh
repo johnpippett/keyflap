@@ -14,7 +14,7 @@
 #     re-run only missing attributes are added and a mismatch is an error (TCC forbids
 #     re-setting them);
 #   - root-owned code and runtime in /opt/keyflap: the bundle copied with fresh root-owned
-#     inodes, a pinned Node 22 (checksum-verified), Playwright's Chromium 1248 (the full
+#     inodes, a pinned Node 22 (checksum-verified), Playwright's Chromium 1255 (the full
 #     browser; it runs headless with its own sandbox on), and keyflap-launch, the small program
 #     that hands launchd's sockets to each service the way systemd does. The quarantine
 #     attribute is stripped from every copy before anything in it runs: Gatekeeper blocks a

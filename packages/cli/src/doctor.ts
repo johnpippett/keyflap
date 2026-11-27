@@ -77,8 +77,8 @@ export type DoctorContext = DevDoctorContext | ServiceDoctorContext;
 
 export const MIN_NODE: ReadonlyArray<readonly [number, number, number]> = [
   [22, 23, 5],
-  [24, 22, 1],
-  [26, 12, 1],
+  [24, 22, 3],
+  [26, 13, 1],
 ];
 export const MIN_NODE_TEXT = MIN_NODE.map((v) => v.join('.')).join(', ');
 

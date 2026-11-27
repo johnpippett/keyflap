@@ -206,9 +206,9 @@ to `.github/workflows/`.
   `packages/signer/src/platform.ts` (service mode: `SERVICE_PLATFORMS`, linux/systemd and
   darwin/launchd; the CLI's per-platform strings are in `cli/src/service/manager.ts` and
   `paths.ts`). Dev mode and the unit and e2e tests also run on macOS (`.github/workflows/macos.yml`).
-- Playwright is pinned to 1.64.1 (Chromium revision 1248). The revision is also pinned in
+- Playwright is pinned to 1.65.1 (Chromium revision 1255). The revision is also pinned in
   `packages/install/linux/runtime-pins.sh` (build-bundle.sh refuses a mismatch), the demo
-  image digest (`demo/Containerfile`) and the isolation tests (`chromium-1248`); bump them
+  image digest (`demo/Containerfile`) and the isolation tests (`chromium-1255`); bump them
   together (IMPLEMENTATION_NOTES "Runtime pins"), and re-verify `shim/src/native-webauthn-block.ts`:
   it hooks Playwright internals to keep native WebAuthn off real authenticators (it fails
   closed if they change, so a bump that breaks it shows up as launch failures).

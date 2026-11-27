@@ -25,7 +25,7 @@ const SLOW = { timeout: 90_000 };
 const PLAIN = `==> installing ${VERSION}
 ==> service users _keyflap-core, _keyflap-signer, _keyflap-web
 ==> code and runtime in /opt/keyflap
-==> downloading Chromium 1248 (Playwright's installer)
+==> downloading Chromium 1255 (Playwright's installer)
 ==> credentials in /Library/Keyflap/credentials
 ==> data in /Library/Keyflap/data
 ==> letting _keyflap-signer read Tailscale's token in /Library/Tailscale

@@ -51,7 +51,7 @@ export function hostNodeDir(): string {
   return dirname(dirname(realpathSync(process.execPath)));
 }
 
-export const CHROMIUM_REVISION = '1248';
+export const CHROMIUM_REVISION = '1255';
 
 export function hostBrowsersDir(): string {
   const dir =

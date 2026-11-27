@@ -164,9 +164,9 @@ const SETUP = `console.log('(keyflap setup runs here: your phone, your agent, yo
 `;
 
 const PLAYWRIGHT = `const { mkdirSync, writeFileSync } = require('node:fs');
-const dir = process.env.PLAYWRIGHT_BROWSERS_PATH + '/chromium-1248';
+const dir = process.env.PLAYWRIGHT_BROWSERS_PATH + '/chromium-1255';
 const delay = Number(process.env.FAKE_DELAY || 0) * 1000;
-console.log('Downloading Chromium 140.0.7339.16 (playwright build v1248) from https://cdn.playwright.dev/fake');
+console.log('Downloading Chromium 140.0.7339.16 (playwright build v1255) from https://cdn.playwright.dev/fake');
 let row = 0;
 const tick = () => {
   console.log('|' + '\\u25A0'.repeat(row * 8) + ' '.repeat((10 - row) * 8) + '| ' + String(row * 10).padStart(3) + '% of 162.5 MiB');

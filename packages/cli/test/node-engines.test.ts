@@ -70,17 +70,17 @@ describe('doctor and package.json engines name the same supported Node versions'
   });
 
   it('the range reader is correct on a small example', () => {
-    const range = '^22.23.5 || ^24.22.1 || >=26.12.1';
+    const range = '^22.23.5 || ^24.22.3 || >=26.13.1';
     expect(
       [
         '22.23.3',
         '22.23.5',
         '22.99.0',
         '23.0.0',
-        '24.22.1',
+        '24.22.3',
         '25.0.0',
-        '26.12.0',
-        '26.12.1',
+        '26.13.0',
+        '26.13.1',
         '40.0.0',
       ].map((v) => satisfies(v, range)),
     ).toEqual([false, true, true, false, true, false, false, true, true]);

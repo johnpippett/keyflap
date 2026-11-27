@@ -7,7 +7,7 @@ FROM docker.io/library/ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 # systemd + the tools the probe uses (python3 for ptrace(2)), plus the shared libraries
-# Playwright's Chromium 1248 needs on Ubuntu 24.04 (headless shell and the full build).
+# Playwright's Chromium 1255 needs on Ubuntu 24.04 (headless shell and the full build).
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       systemd systemd-sysv dbus ca-certificates curl unzip xz-utils procps iproute2 python3 sudo \
