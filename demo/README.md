@@ -9,7 +9,7 @@ A throwaway container for trying Keyflap before you install anything. Inside it:
   answer it there;
 - the bundled test relying party (`packages/test-rp`): passkeys on
   `http://localhost:3000`, password + TOTP on `http://rp.localhost:3000`;
-- headless Chromium (Playwright 1.64.1), driven by the broker;
+- headless Chromium (Playwright 1.65.1), driven by the broker;
 - a pre-created agent, `demo-agent`, and one stored login: the test site's seeded user
   `alice` / `correct horse battery staple`, TOTP secret `JBSWY3DPEHPK3PXP` (public test
   values).
@@ -130,7 +130,7 @@ it to the model) and always exits 0.
 
 | File | What it does |
 |---|---|
-| `Containerfile` | Playwright 1.64.1 image (Chromium revision 1248), pinned by digest, plus checksum-pinned Node 22.23.5; `pnpm install --prod`; runs as `pwuser` |
+| `Containerfile` | Playwright 1.65.1 image (Chromium revision 1255), pinned by digest, plus checksum-pinned Node 22.23.5; `pnpm install --prod`; runs as `pwuser` |
 | `entrypoint.sh` | starts the test RP, adds the demo login and agent, prints the token and `.mcp.json`, then runs the daemon in the foreground |
 | `mcp-relay.ts` | relays the published port to the MCP endpoint, which stays bound to the container's loopback |
 | `say.ts` | the `say` command: records your intent through the hook |

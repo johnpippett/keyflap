@@ -82,7 +82,7 @@ const status = (r: Awaited<ReturnType<typeof runChecks>>, id: string) =>
 
 describe('keyflap doctor: Node version', () => {
   it('accepts only the patched release of each supported line', () => {
-    for (const v of ['22.23.5', 'v22.23.5', '22.24.0', '24.22.1', '24.23.0', '26.12.1', '27.0.0']) {
+    for (const v of ['22.23.5', 'v22.23.5', '22.24.0', '24.22.3', '24.23.0', '26.13.1', '27.0.0']) {
       expect(nodeIsSupported(v), v).toBe(true);
     }
     for (const v of [
@@ -91,8 +91,12 @@ describe('keyflap doctor: Node version', () => {
       '22.18.0',
       '20.19.0',
       '23.11.0',
+      '24.22.2',
+      '24.22.1',
       '24.22.0',
       '25.9.0',
+      '26.13.0',
+      '26.12.1',
       '26.12.0',
     ]) {
       expect(nodeIsSupported(v), v).toBe(false);

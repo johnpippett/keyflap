@@ -3,6 +3,19 @@
 Decisions made while implementing ARCHITECTURE.md, especially where the code deviates
 from or tightens the design. Keep this current.
 
+## Playwright 1.65.1, Chrome for Testing 159.0.8154.33, and Node 24/26 floors (2026-11-26)
+
+- Playwright moves from `1.64.1` (Chromium revision `1248`) to `1.65.1` (revision `1255`)
+  across workspace packages, `packages/install/linux/runtime-pins.sh`, `demo/Containerfile`
+  (pinned by multi-arch OCI index digest), and the isolation/install tests.
+- `CHROME_FOR_TESTING_VERSION` moves from `156.0.8078.80` to `159.0.8154.33` with new
+  SHA-256 checksums for all eight full and headless-shell archives.
+- `shim/src/native-webauthn-block.ts` is re-verified against Playwright `1.65.1` and
+  Chromium `1255` through the full e2e suite (including `inv6-inv7-native-webauthn.e2e.test.ts`).
+- `engines.node`, `packages/cli/src/doctor.ts` (`MIN_NODE`), and the `verify-aab` launcher
+  raise the 24.x and 26.x floors from `24.22.1` / `26.12.1` to the November 2026 security
+  releases `24.22.3` and `26.13.1`, matching the existing `22.23.5` floor.
+
 ## Package manager security patch (2026-11-20)
 
 The package manager and cloud-session fallback now pin pnpm 10.34.9, the latest 10.x

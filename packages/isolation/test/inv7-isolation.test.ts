@@ -105,7 +105,7 @@ describe.skipIf(skipReason !== null || L.os !== 'darwin')(
       }).stdout;
       expect(cmdline).toContain('--headless');
       expect(cmdline).not.toContain('--no-sandbox');
-      expect(cmdline).toContain('chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app');
+      expect(cmdline).toContain('chromium-1255/chrome-mac-arm64/Google Chrome for Testing.app');
     });
   },
 );

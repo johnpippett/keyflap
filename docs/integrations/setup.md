@@ -211,7 +211,7 @@ fix for each problem:
 
 | Check | Dev mode | Service mode |
 |---|---|---|
-| mode, node | same-user dev mode, Node ≥ 22.23.5 (or 24.22.1+, 26.12.1+) | service mode |
+| mode, node | same-user dev mode, Node ≥ 22.23.5 (or 24.22.3+, 26.13.1+) | service mode |
 | units | | `systemctl is-active` keyflap-signer, keyflap-core, keyflap-approver; on a Mac `launchctl print system/com.keyflap.{signer,core,approver}` |
 | data-dir, sockets | data dir 0700; intent socket and host token yours, 0600 | intent socket (install user, 0600), admin sockets (root, 0600) |
 | daemon, signer, mcp | intent socket answers (else the exact `keyflap daemon` command); signer socket; MCP answers 401 without a token | signer admin socket; MCP |

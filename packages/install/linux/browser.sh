@@ -1,5 +1,5 @@
 # Chrome for Testing, installed inside Playwright's Chromium revision directories: Playwright
-# 1.64.1 pins revision 1248, whose Chrome 156.0.8078.4 has known vulnerabilities. Fetches
+# 1.65.1 pins revision 1255, whose Chrome 159.0.8154.6 can trail patch releases. Fetches
 # CHROME_FOR_TESTING_VERSION (runtime-pins.sh) and keeps Playwright's layout unchanged, so the
 # pinned Playwright still finds its browser. Bash 3.2 and BSD userland; functions only.
 #

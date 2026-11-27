@@ -71,7 +71,7 @@ describe.skipIf(skipReason !== null || L.os !== 'linux')(
       const p = pids();
       expect(p.xvfb).toBeGreaterThan(0);
       const cmdline = c.exec(['cat', `/proc/${p.chromium}/cmdline`], { check: true }).stdout;
-      expect(cmdline).toContain('chromium-1248/chrome-linux64/chrome');
+      expect(cmdline).toContain('chromium-1255/chrome-linux64/chrome');
       expect(cmdline).not.toContain('--headless');
     });
 

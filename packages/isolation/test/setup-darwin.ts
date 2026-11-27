@@ -165,7 +165,7 @@ export async function setupDarwin(
        cp -R ${artifacts}/bundle ${DARWIN_STAGE}/bundle
        cp -R ${REPO}/packages/install ${DARWIN_STAGE}/install
        install -d -m 0700 ${DARWIN_STAGE}/browsers
-       cp -R ${JSON.stringify(join(homedir(), 'Library/Caches/ms-playwright/chromium-1248'))} ${DARWIN_STAGE}/browsers/
+       cp -R ${JSON.stringify(join(homedir(), 'Library/Caches/ms-playwright/chromium-1255'))} ${DARWIN_STAGE}/browsers/
        chown -R root:wheel ${DARWIN_STAGE} && chmod -R go-w ${DARWIN_STAGE}`,
       10 * 60_000,
     );

@@ -12,7 +12,7 @@
 #   - root-owned code and runtime in /opt/keyflap: the bundle (the release's bundle/, or
 #     build-bundle.sh output) copied with fresh root-owned inodes, a pinned Node 22 (the
 #     release's tarball or a download, checksum-verified either way, or --node-dir), and
-#     Playwright's Chromium 1248 (playwright install, or --browsers-dir);
+#     Playwright's Chromium 1255 (playwright install, or --browsers-dir);
 #   - secrets as systemd credentials in /etc/keyflap/credentials (root 0700), sealed with
 #     systemd-creds (TPM2 when present, else the host key): the key-store KEK (D1), the
 #     signer channel key and the host token. A plain copy of the host token goes to

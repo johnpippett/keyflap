@@ -116,7 +116,7 @@ const LINUX: Layout = {
     nodeBinary: { kind: 'write', path: '/opt/keyflap/node/bin/node' },
     chromium: {
       kind: 'write',
-      path: '/opt/keyflap/browsers/chromium-1248/chrome-linux64/chrome',
+      path: '/opt/keyflap/browsers/chromium-1255/chrome-linux64/chrome',
     },
     wrapper: { kind: 'write', path: '/usr/local/bin/keyflap' },
     coreConfig: { kind: 'write', path: '/etc/keyflap/core.json' },
@@ -135,7 +135,7 @@ const CREDS = `${LIB}/credentials`;
 const DATA = `${LIB}/data`;
 const LOGS = `${LIB}/log`;
 const CHROMIUM_APP =
-  '/opt/keyflap/browsers/chromium-1248/chrome-mac-arm64/Google Chrome for Testing.app';
+  '/opt/keyflap/browsers/chromium-1255/chrome-mac-arm64/Google Chrome for Testing.app';
 
 const DARWIN: Layout = {
   os: 'darwin',
