@@ -82,7 +82,8 @@ function suffixLength(labels: string[], r: Rules): number {
   for (let i = 0; i < n; i++) {
     const l = n - i;
     if (l <= len) break;
-    if (r.normal.has(labels.slice(i).join('.'))) len = l;
+    const suffix = labels.slice(i).join('.');
+    if (r.normal.has(suffix) || r.wildcard.has(suffix)) len = l;
     else if (i + 1 < n && r.wildcard.has(labels.slice(i + 1).join('.'))) len = l;
   }
   return len;
